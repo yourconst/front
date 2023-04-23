@@ -32,6 +32,7 @@ const filenames = fromDir(__dirname + '/src', '.html');
 export default defineConfig({
   // root: '.',
   // publicDir: './public',
+  base: './',
   plugins: [svelte()],
   assetsInclude: ['**/*.frag', '**/*.vert'],
   build: {
