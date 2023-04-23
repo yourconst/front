@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Helpers } from '../../helpers';
+  import { Helpers } from '../../helpers/common';
   import AxisDrawer from './AxisDrawer.svelte';
   import * as Solution from './lib';
 

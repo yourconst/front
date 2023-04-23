@@ -1,26 +1,6 @@
-const vertexData = new Float32Array([
-    -1.0,
-    1.0, // top left
-    -1.0,
-    -1.0, // bottom left
-    1.0,
-    1.0, // top right
-    1.0,
-    -1.0 // bottom right
-]);
-
-const vertexSource = `
-#version 300 es
-in vec2 position;
-void main() {
-    gl_Position = vec4(position, 0.0, 1.0);
-}
-`;
-
-const fragmentSource = `
 #version 300 es
 #ifdef GL_ES
-precision lowp float;
+precision mediump float;
 #endif
 
 struct Sphere {
@@ -32,12 +12,12 @@ struct Sphere {
 uniform Info {
     vec3 origin;
     vec2 directionXZ;
+    vec2 directionYZ;
     vec2 sizes;
     float d;
     float viewDistance;
     int lightsCount;
     int count;
-    Sphere lights[4];
     Sphere spheres[100];
 } info;
 
@@ -66,6 +46,15 @@ float Sphere_getRayDistance(Sphere s, Ray ray) {
 
 vec3 Sphere_getNormal(Sphere s, vec3 hitPoint) {
     return (hitPoint - s.center) / s.radius;
+    // vec3 result = (hitPoint - s.center) / s.radius;
+
+    // float m = 1.0;
+
+    // result.x += (result.y + result.z) * m;
+    // result.y += (result.x + result.z) * m;
+    // result.z += (result.y + result.x) * m;
+
+    // return result;
 }
 
 
@@ -85,24 +74,30 @@ vec3 getHitColor(Ray ray) {
         return vec3(0.0, 0.0, 0.0);
     }
 
-    vec3 color = info.spheres[hitIndex].color * 0.1;
+    vec3 color = info.spheres[hitIndex].color;
     vec3 hitPoint = ray.origin + ray.direction * distance;
     vec3 hitNormal = Sphere_getNormal(info.spheres[hitIndex], hitPoint);
-    color *= -dot(ray.direction, hitNormal);
+    color *= -dot(ray.direction, hitNormal); // * dot(ray.direction, hitNormal);
+
+    if (hitIndex < info.lightsCount) {
+        return color;
+    }
+
+    color *= 0.1;
 
     for (int j=0; j<info.lightsCount; ++j) {
-        Ray lightRay = Ray(hitPoint, normalize(info.lights[j].center - hitPoint));
+        Ray lightRay = Ray(hitPoint, normalize(info.spheres[j].center - hitPoint));
         float lightCos = dot(lightRay.direction, hitNormal);
 
         if (lightCos < 0.0) {
             continue;
         }
 
-        float lightDistance = Sphere_getRayDistance(info.lights[j], lightRay);
+        float lightDistance = Sphere_getRayDistance(info.spheres[j], lightRay);
 
         bool inDark = false;
 
-        for (int i=0; i<info.count; ++i) if (i != hitIndex) {
+        for (int i=info.lightsCount; i<info.count; ++i) if (i != hitIndex) {
             float _distance = Sphere_getRayDistance(info.spheres[i], lightRay);
     
             if (_distance < lightDistance) {
@@ -112,7 +107,7 @@ vec3 getHitColor(Ray ray) {
         }
 
         if (!inDark)
-        color *= (1.0 + info.lights[j].color * lightCos);
+        color *= (1.0 + info.spheres[j].color * lightCos * pow(info.spheres[j].radius / lightDistance, 0.5));
     }
 
     return color;
@@ -120,24 +115,20 @@ vec3 getHitColor(Ray ray) {
 
 void main() {
     float m = info.sizes.x > info.sizes.y ? info.sizes.x : info.sizes.y;
-    vec2 rp = (gl_FragCoord.xy - (info.sizes * 0.5)) / m / info.d;
+    vec3 rp = vec3((gl_FragCoord.xy - (info.sizes * 0.5)) / m, info.d);
 
     vec3 dir3 = vec3(
-        rp.x * info.directionXZ.x - 1.0 * info.directionXZ.y,
-        rp.y,
-        rp.x * info.directionXZ.y + 1.0 * info.directionXZ.x
+        rp.x * info.directionXZ.x - rp.z * info.directionXZ.y,
+        0.0,
+        rp.x * info.directionXZ.y + rp.z * info.directionXZ.x
     );
 
-    Ray ray = Ray(info.origin, dir3);
+    float z = dir3.z;
+
+    dir3.y = rp.y * info.directionYZ.x - z * info.directionYZ.y;
+    dir3.z = rp.y * info.directionYZ.y + z * info.directionYZ.x;
+
+    Ray ray = Ray(info.origin, normalize(dir3));
 
     color = vec4(getHitColor(ray), 1.0);
-}`;
-
-export const vertex = {
-    data: vertexData,
-    source: vertexSource,
-};
-
-export const fragment = {
-    source: fragmentSource,
-};
+}

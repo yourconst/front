@@ -19,6 +19,7 @@
     "vite": "^4.2.0"
   },
   "dependencies": {
-    "@types/node": "^18.15.11"
+    "@types/node": "^18.15.11",
+    "eventemitter3": "^5.0.0"
   }
 }

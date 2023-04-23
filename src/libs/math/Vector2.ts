@@ -1,18 +1,34 @@
+import { Helpers } from "../../helpers/common";
+
 export class Vector2 {
     static fromAngle(a = 0, r = 1) {
         return new Vector2(Math.cos(a) * r, Math.sin(a) * r);
     }
 
+    static createRandom(max = 1, min = 0) {
+        return new Vector2(
+            Helpers.rand(max, min),
+            Helpers.rand(max, min),
+        );
+    }
+
     constructor(public x = 0, public y = 0) { }
+
+    clone() {
+        return new Vector2(this.x, this.y);
+    }
+
+    putToArray(array: ArrayBufferView | Array<number>, offset = 0) {
+        array[offset + 0] = this.x;
+        array[offset + 1] = this.y;
+
+        return offset + 2;
+    }
 
     set(x = 0, y = 0) {
         this.x = x;
         this.y = y;
         return this;
-    }
-
-    clone() {
-        return new Vector2(this.x, this.y);
     }
 
     plus(v: Vector2) {
@@ -28,7 +44,7 @@ export class Vector2 {
         return this;
     }
 
-    rotateAngle(a = 0) {
+    rotateByAngle(a = 0) {
         const { x, y } = this;
         const cos = Math.cos(a), sin = Math.sin(a);
 

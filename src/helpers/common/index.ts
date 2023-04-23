@@ -124,4 +124,12 @@ export class Helpers {
     static readonly PromiseManaged = PromiseManaged;
     static readonly PromiseManagedTimeouted = PromiseManagedTimeouted;
     static readonly SleeperChanging = SleeperChanging;
+
+    static rand(max: number, min = 0) {
+        return min + Math.random() * (max - min);
+    }
+
+    static randInt(max: number, min = 0) {
+        return Math.trunc(Helpers.rand(max, min));
+    }
 }
