@@ -131,4 +131,8 @@ void main() {
     Ray ray = Ray(info.origin, normalize(dir3));
 
     color = vec4(getHitColor(ray), 1.0);
+
+    // color.x = pow(color.x, 1.0 / 2.2);
+    // color.y = pow(color.y, 1.0 / 2.2);
+    // color.z = pow(color.z, 1.0 / 2.2);
 }

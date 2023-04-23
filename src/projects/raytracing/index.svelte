@@ -15,27 +15,42 @@
     const gkm = new GKM<
         'moveFront' | 'moveBack' | 'moveLeft' | 'moveRight' |
         'moveUp' | 'moveDown' |
-        'moveFast',
-        'viewX' | 'viewY'
+        'moveFast' |
+        'zoomIn' | 'zoomOut' |
+        'menu',
+        'viewX' | 'viewY' | 'zoom'
     >({
         keysBindings: {
             KeyW: 'moveFront',
+            GAMEPAD_TRIGGER_RIGHT: 'moveFront',
             KeyS: 'moveBack',
+            GAMEPAD_TRIGGER_LEFT: 'moveBack',
             KeyA: 'moveLeft',
             KeyD: 'moveRight',
             ShiftLeft: 'moveDown',
             Space: 'moveUp',
             KeyX: 'moveFast',
-            // GAMEPAD_BUMPER_RIGHT: 'moveFront',
-            GAMEPAD_TRIGGER_RIGHT: 'moveFront',
+            GAMEPAD_A: 'moveFast',
+            GAMEPAD_UP: 'zoomIn',
+            GAMEPAD_DOWN: 'zoomOut',
+            CapsLock: 'menu',
+            GAMEPAD_START: 'menu',
         },
         axesBindings: {
             MOUSE_MOVEMENT_X: 'viewX',
             MOUSE_MOVEMENT_Y: 'viewY',
             GAMEPAD_STICK_LEFT_X: 'viewX',
             GAMEPAD_STICK_LEFT_Y: 'viewY',
+            MOUSE_WHEEL_Y: 'zoom',
         },
     });
+
+    function zoom(value: number) {
+        if (!value) return;
+
+        const c = 1.15;
+        state.camera.d *= value > 0 ? c : (1 / c);
+    }
 
     gkm.addListener('axismove', (axis, value) => {
         // console.log(axis);
@@ -48,15 +63,16 @@
                 state.camera.angles.x += value / 1000 / state.camera.d;
         }
 
-        if (axis === 'MOUSE_WHEEL_Y') {
-            const c = 1.15;
-            state.camera.d *= value < 0 ? c : (1 / c);
+        if (axis === 'zoom') {
+            zoom(-value);
         }
     });
 
     gkm.addListener('keydown', (key) => {
-        if (key === 'CapsLock')
+        if (key === 'menu') {
             state.isPause = !state.isPause;
+            state.lastUpdateTime = Date.now();
+        }
     });
 
     function onWindowResize() {
@@ -69,6 +85,9 @@
     }
 
     function checkKeys() {
+        zoom(+gkm.getKeyValue('zoomIn'));
+        zoom(-gkm.getKeyValue('zoomOut'));
+
         const maxAcceleration = gkm.isKeyPressed('moveFast') ? state.accelerationFast : state.acceleration;
 
         const tmp = new Vector3();
@@ -110,7 +129,7 @@
         }
 
         const time = Date.now();
-        const dt = Math.min(100, time - state.lastUpdateTime) / 1000 * state.timeMultiplier;
+        const dt = (time - state.lastUpdateTime) / 1000 * state.timeMultiplier;
         state.time += dt;
         state.dtsArray.push(time - state.lastUpdateTime);
         state.lastUpdateTime = time;
