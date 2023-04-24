@@ -18,6 +18,14 @@ export class Vector2 {
         return new Vector2(this.x, this.y);
     }
 
+    isEquals(v: Vector2) {
+        return this.x === v.x && this.y === v.y;
+    }
+
+    isEqualsN(x: number, y: number) {
+        return this.x === x && this.y === y;
+    }
+
     putToArray(array: ArrayBufferView | Array<number>, offset = 0) {
         array[offset + 0] = this.x;
         array[offset + 1] = this.y;
@@ -25,7 +33,13 @@ export class Vector2 {
         return offset + 2;
     }
 
-    set(x = 0, y = 0) {
+    set(v: Vector2) {
+        this.x = v.x;
+        this.y = v.y;
+        return this;
+    }
+
+    setN(x = this.x, y = this.y) {
         this.x = x;
         this.y = y;
         return this;

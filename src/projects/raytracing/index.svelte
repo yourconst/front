@@ -1,5 +1,6 @@
 <script lang="ts">
     import { onMount, onDestroy } from "svelte";
+    import { writable } from 'svelte/store';
     import { GKM } from "../../libs/gui/gkm";
     import { Gl2Utils } from "../../helpers/webgl/Gl2Utils";
     import { Vector2 } from "../../libs/math/Vector2";
@@ -7,34 +8,78 @@
     import { Sphere } from "../../libs/geometry/Sphere";
     import * as SHADERS from "./shaders";
     import { Matrix } from "../../libs/math/Matrix";
+    import { HelpersSvelte } from "../../helpers/svelte";
+    import { Helpers } from "../../helpers/common";
+    import Menu from "./components/Menu.svelte";
+    import Fps from "./components/Fps.svelte";
 
+    let onFrame: () => number;
     let canvas: HTMLCanvasElement;
     let ut: Gl2Utils;
-    let state: ReturnType<typeof getState>;
+    const state = {
+        isDestroyed: false,
+        isPause: false,
+        isMenu: false,
+        program: <WebGLProgram> null,
+        attributes: {
+            positions: <number> null,
+        },
+        uniforms: {
+            buffer: <WebGLBuffer> null,
+        },
+        resolution: new Vector3(1, 1, 0.5),
+        camera: {
+            origin: new Vector3(0, 0, -100000),
+            angles: new Vector3(),
+            d: 1,
+            viewDistance: 1e15,
+        },
+        objects: <Sphere[]>[],
+        lights: <Sphere[]>[
+            new Sphere(
+                new Vector3(0, 0, 149_600_000_000), 696_340_000, new Vector3(1, 1, 1).multiplyN(2e3),
+            ),
+        ],
+        objectsCount: 10,
+        lightsCount: 2,
+        acceleration: 1e7,
+        accelerationBoost: 5,
+        lightLoopPeriod: 5,
+        lightLoopRadius: 25000,
+        time: 0,
+        timeMultiplier: 1,
+    };
+
+    function reset() {
+        state.camera.origin.setN(0, 0, -100000);
+        state.camera.angles.setN(0, 0, 0);
+        state.camera.d = 1;
+    }
 
     const gkm = new GKM<
         'moveFront' | 'moveBack' | 'moveLeft' | 'moveRight' |
         'moveUp' | 'moveDown' |
         'moveFast' |
         'zoomIn' | 'zoomOut' |
-        'menu',
+        'pause' | 'menu' | 'reset' |
+        'viewZ+' | 'viewZ-',
         'viewX' | 'viewY' | 'zoom'
     >({
         keysBindings: {
-            KeyW: 'moveFront',
-            GAMEPAD_TRIGGER_RIGHT: 'moveFront',
-            KeyS: 'moveBack',
-            GAMEPAD_TRIGGER_LEFT: 'moveBack',
+            KeyW: 'moveFront', GAMEPAD_TRIGGER_RIGHT: 'moveFront',
+            KeyS: 'moveBack', GAMEPAD_TRIGGER_LEFT: 'moveBack',
             KeyA: 'moveLeft',
             KeyD: 'moveRight',
             ShiftLeft: 'moveDown',
             Space: 'moveUp',
-            KeyX: 'moveFast',
-            GAMEPAD_A: 'moveFast',
-            GAMEPAD_UP: 'zoomIn',
-            GAMEPAD_DOWN: 'zoomOut',
-            CapsLock: 'menu',
-            GAMEPAD_START: 'menu',
+            KeyX: 'moveFast', GAMEPAD_A: 'moveFast',
+            ArrowUp: 'zoomIn', GAMEPAD_UP: 'zoomIn',
+            ArrowDown: 'zoomOut', GAMEPAD_DOWN: 'zoomOut',
+            ArrowLeft: 'viewZ-',
+            ArrowRight: 'viewZ+',
+            Escape: 'menu',
+            KeyP: 'pause', GAMEPAD_GUIDE: 'pause',
+            KeyR: 'reset', GAMEPAD_START: 'reset',
         },
         axesBindings: {
             MOUSE_MOVEMENT_X: 'viewX',
@@ -60,7 +105,7 @@
                 state.camera.angles.y -= value / 1000 / state.camera.d;
             
             if (axis === 'viewY')
-                state.camera.angles.x += value / 1000 / state.camera.d;
+                state.camera.angles.x -= value / 1000 / state.camera.d;
         }
 
         if (axis === 'zoom') {
@@ -68,27 +113,41 @@
         }
     });
 
-    gkm.addListener('keydown', (key) => {
+    gkm.addListener('keydown', (key, value) => {
         if (key === 'menu') {
+            state.isMenu = !state.isMenu;
+        } else
+        if (key === 'pause') {
             state.isPause = !state.isPause;
-            state.lastUpdateTime = Date.now();
+        } else
+        if (key === 'reset') {
+            reset();
         }
     });
 
-    function onWindowResize() {
-        state.sizes.set(window.innerWidth, window.innerHeight);
+    function checkResolution() {
+        const sz = state.resolution;
 
-        canvas.width = state.sizes.x;
-        canvas.height = state.sizes.y;
+        sz.setN(window.innerWidth * sz.z, window.innerHeight * sz.z);
 
-        ut.gl.viewport(0, 0, state.sizes.x, state.sizes.y);
+        if (sz.isEqualsN(canvas.width, canvas.height)) {
+            return;
+        }
+        
+        canvas.width = sz.x;
+        canvas.height = sz.y;
+
+        ut.gl.viewport(0, 0, sz.x, sz.y);
     }
 
     function checkKeys() {
         zoom(+gkm.getKeyValue('zoomIn'));
         zoom(-gkm.getKeyValue('zoomOut'));
 
-        const maxAcceleration = gkm.isKeyPressed('moveFast') ? state.accelerationFast : state.acceleration;
+        state.camera.angles.z += 0.05 * gkm.getKeyValue('viewZ+');
+        state.camera.angles.z -= 0.05 * gkm.getKeyValue('viewZ-');
+
+        const maxAcceleration = state.acceleration * (gkm.isKeyPressed('moveFast') ? state.accelerationBoost : 1);
 
         const tmp = new Vector3();
 
@@ -99,138 +158,129 @@
         tmp.z -= gkm.getKeyValue('moveBack');
         tmp.z += gkm.getKeyValue('moveFront');
 
-        // const m = Matrix.createRotation3x3FromAnglesVector(state.camera.angles);
+        const m = Matrix.createRotation3x3FromAnglesVector(state.camera.angles);
 
-        // console.log(m.cells);
-
-        // const acceleration = m.multiplyVector3Column(tmp).multiplyN(maxAcceleration);
-
-        const acceleration = tmp;
-        
-        acceleration.rotateByAngles(state.camera.angles.y, state.camera.angles.x);
+        const acceleration = m.multiplyVector3Column(tmp);
 
         acceleration.normalize(maxAcceleration * Math.min(
             1,
             acceleration.length(),
         ));
 
-        // console.log(acceleration);
-
         return {
             acceleration,
         };
     }
 
-    let draw = () => {
+    function checkGui() {
+        if (state.objectsCount > state.objects.length) {
+            const count = state.objectsCount - state.objects.length;
+            for (let i=0; i<count; ++i) {
+                state.objects.push(new Sphere(
+                    Vector3.createRandom(10000, -10000), Helpers.rand(2500, 3500), Vector3.createRandom(1, 0.1),
+                ));
+            }
+        } else {
+            state.objects.length = Math.max(0, state.objectsCount || 0);
+        }
+
+        if (state.lightsCount > state.lights.length) {
+            const count = state.lightsCount - state.lights.length;
+            for (let i=0; i<count; ++i) {
+                state.lights.push(new Sphere(
+                    Vector3.createRandom(10000, -10000), Helpers.rand(2500, 3500), Vector3.createRandom(20, 0.1),
+                ));
+            }
+        } else {
+            state.lights.length = Math.max(0, state.lightsCount || 0);
+        }
+    }
+
+    // const offscreenCanvas = document.createElement("canvas");
+    // const offscreenCanvasCtx = offscreenCanvas.getContext("2d");
+
+    function draw() {
+        if (state.isDestroyed) {
+            return;
+        }
+
         requestAnimationFrame(draw);
+
+        // return;
 
         if (state.isPause) {
             return;
         }
 
-        const time = Date.now();
-        const dt = (time - state.lastUpdateTime) / 1000 * state.timeMultiplier;
+        checkGui();
+        checkResolution();
+
+        const dt = onFrame() / 1000 * state.timeMultiplier;
         state.time += dt;
-        state.dtsArray.push(time - state.lastUpdateTime);
-        state.lastUpdateTime = time;
-        if (state.dtsArray.length > 30) {
-            state.dtsArray.shift();
-        }
-        state.fps = (
-            1000 / (state.dtsArray.reduce((acc, v) => acc + v, 0) / state.dtsArray.length)
-        ).toFixed(2);
 
         const { acceleration } = checkKeys();
 
-        state.camera.origin.plus(acceleration.multiplyN(dt * dt));
+        state.camera.origin.plus(acceleration.multiplyN(/* dt * dt */ 0.016 * 0.016));
 
         const lightXZ = Vector2.fromAngle(
             state.time * (2 * Math.PI) / state.lightLoopPeriod,
             state.lightLoopRadius,
         );
 
-        state.lights[0].center.setN(lightXZ.x, 0, lightXZ.y);
-        state.lights[1].center.setN(0, lightXZ.y, lightXZ.x);
-        state.lights[2].center.setN(lightXZ.x, lightXZ.y, -lightXZ.x);
+        state.lights[1]?.center.setN(lightXZ.x, 0, lightXZ.y);
+        // state.lights[0].center.setN(lightXZ.x, 0, lightXZ.y);
+        // state.lights[1].center.setN(0, lightXZ.y, lightXZ.x);
+        // state.lights[2].center.setN(lightXZ.x, lightXZ.y, -lightXZ.x);
 
-        const f32a = new Float32Array(16 + 8 * 4 + 8 * 100);
+        const MO = 12;
+        const BO = MO + 8;
+        const SS = 8;
+
+        const f32a = new Float32Array(BO + SS * 100);
         const i32a = new Int32Array(f32a.buffer);
-    
-        state.camera.origin.putToArray(f32a, 0);
-        f32a[3] = 0;
-        Vector2.fromAngle(state.camera.angles.y).putToArray(f32a, 4);
-        Vector2.fromAngle(state.camera.angles.x).putToArray(f32a, 6);
-        state.sizes.putToArray(f32a, 8);
 
-        f32a[10] = state.camera.d;
-        f32a[11] = state.camera.viewDistance;
-        i32a[12] = state.lights.length;
-        i32a[13] = state.lights.length + state.spheres.length;
-        f32a[14] = 0;
-        f32a[15] = 0;
+        const rotationMatrix = Matrix.createRotation3x3FromAnglesVector(state.camera.angles);
+        // const rotationMatrix = Matrix.createRotation3x3FromAngles(
+        //     state.camera.angles.z,
+        //     state.camera.angles.x,
+        //     state.camera.angles.y,
+        // );
 
-        const bodies = [...state.lights, ...state.spheres];
+        // console.log(rotationMatrix.cells);
+
+        rotationMatrix.putToArray(f32a, 0);
+
+        state.resolution.putToArray(f32a, MO + 0);
+
+        f32a[MO + 2] = state.camera.d;
+        f32a[MO + 3] = state.camera.viewDistance;
+        i32a[MO + 4] = state.lights.length;
+        i32a[MO + 5] = state.lights.length + state.objects.length;
+
+        const bodies = [...state.lights, ...state.objects];
 
         for (let i=0; i<bodies.length; ++i) {
-            bodies[i].putToArray(f32a, 16 + 8 * i);
+            bodies[i].putToArray(f32a, BO + SS * i, state.camera.origin);
         }
         
-        ut.updateUniformBuffer(state.ubgb, f32a.buffer);
+        ut.updateUniformBuffer(state.uniforms.buffer, f32a.buffer);
 
         ut.gl.drawArrays(ut.gl.TRIANGLE_STRIP, 0, 4);
+
+
+        // const r = rotationMatrix.multiplyVector3Column(new Vector3(0, 0, state.camera.d));
+        // // const o = 6;
+        // // const r = new Vector3(rotationMatrix.cells[o+0], rotationMatrix.cells[o+1], rotationMatrix.cells[o+2]);
+
+        // offscreenCanvas.width = canvas.width;
+        // offscreenCanvas.height = canvas.height;
+        // offscreenCanvasCtx.drawImage(canvas,0,0);
+        // const {data: d} = offscreenCanvasCtx.getImageData(0,0, offscreenCanvas.width, offscreenCanvas.height);
+
+        // console.log(r);
+        // console.log(new Vector3(d[0], d[1], d[2]).multiplyN(1 / 255));
+        // console.log(rotationMatrix.cells);
     };
-
-    function getState(program: WebGLProgram) {
-        const result = {
-            isPause: false,
-            program,
-            attributes: {
-                positions: ut.getAttribLocation(program, 'position'),
-            },
-            ubgb: ut.getUniformBuffer(new Float32Array(16), program, 'Info'),
-            sizes: new Vector2(),
-            camera: {
-                origin: new Vector3(0, 0, -10000),
-                angles: new Vector3(),
-                d: 1,
-                viewDistance: 9999999,
-            },
-            acceleration: 1 * 1e6,
-            accelerationFast: 5 * 1e6,
-            spheres: [
-                new Sphere(new Vector3(3000.0, 0.0, 0.0), 1000.0, new Vector3(1.0, 0.0, 0.0)),
-                new Sphere(new Vector3(2000.0, 0.0, 5000.0), 500.0, new Vector3(1.0, 1.0, 0.0)),
-                new Sphere(new Vector3(0.0, 0.0, 5000.0), 1500.0, new Vector3(1.0, 1.0, 1.0)),
-                // new Sphere(new Vector3(-2000.0, 0.0, 4000.0), 500.0, new Vector3(0.0, 0.0, 1.0)),
-                // new Sphere(new Vector3(-3000.0, 0.0, 6000.0), 500.0, new Vector3(1.0, 1.0, 1.0)),
-                // new Sphere(new Vector3(-4000.0, 0.0, 4000.0), 500.0, new Vector3(1.0, 1.0, 1.0)),
-                // new Sphere(new Vector3(-5000.0, 0.0, 6000.0), 500.0, new Vector3(0.0, 1.0, 0.0)),
-                // new Sphere(new Vector3(-6000.0, 0.0, 4000.0), 500.0, new Vector3(1.0, 1.0, 1.0)),
-                // new Sphere(new Vector3(-7000.0, 0.0, 6000.0), 500.0, new Vector3(1.0, 1.0, 1.0)),
-                // new Sphere(new Vector3(7000.0, 0.0, 5000.0), 500.0, new Vector3(1.0, 1.0, 1.0)),
-            ],
-            lights: [
-                new Sphere(new Vector3(), 1000.0, new Vector3(1, 1, 1).multiplyN(3)),
-                new Sphere(new Vector3(), 1000.0, new Vector3(1, 1, 1).multiplyN(3)),
-                new Sphere(new Vector3(), 1000.0, new Vector3(1, 1, 1).multiplyN(3)),
-            ],
-            lightLoopPeriod: 2,
-            lightLoopRadius: 15000,
-            dtsArray: [],
-            lastUpdateTime: Date.now(),
-            time: 0,
-            timeMultiplier: 1,
-            fps: "0",
-        };
-
-        for (let i=0; i<35; ++i) {
-            result.spheres.push(new Sphere(
-                Vector3.createRandom(10000, -10000), 1000, Vector3.createRandom(1, 0.1),
-            ));
-        }
-
-        return result;
-    }
 
     onMount(() => {
         ut = new Gl2Utils(canvas.getContext('webgl2'));
@@ -243,7 +293,9 @@
             ],
         });
 
-        state = getState(program);
+        state.program = program;
+        state.attributes.positions = ut.getAttribLocation(program, 'position');
+        state.uniforms.buffer = ut.getUniformBuffer(new Float32Array(16), program, 'Info');
 
         ut.bindBuffer(SHADERS.vertex.data);
         ut.gl.enableVertexAttribArray(state.attributes.positions);
@@ -262,37 +314,53 @@
         globalThis['ut'] = ut;
         globalThis['gkm'] = gkm;
 
-        onWindowResize();
-
         draw();
     });
 
     onDestroy(() => {
-        draw = () => {};
+        state.isDestroyed = true;
         gkm.destroy();
     });
+
+    // $: !state.isPause && onFrame?.();
 </script>
+
+<svelte:options ></svelte:options>
 
 <canvas
     bind:this={canvas}
     on:click={e => {
         canvas.requestPointerLock();
     }}
-></canvas>
-<div id='fpsMeter'>{state?.fps}</div>
+    on:touchmove={e => {
+        e.preventDefault();
 
-<svelte:window
-    on:resize={onWindowResize}
-></svelte:window>
+        if (e['scale']) {
+            zoom(e['scale'] - 1);
+        }
+    }}
+></canvas>
+<Fps
+    bind:onFrame={onFrame} bind:isPause={state.isPause}
+    style='left: unset; right: 10px; bottom: 10px; top: unset;'
+></Fps>
+
+<Menu
+    bind:show={state.isMenu}
+    bind:pause={state.isPause}
+    bind:resolution={state.resolution.z}
+    bind:fov={state.camera.d}
+    bind:viewDistance={state.camera.viewDistance}
+    bind:acceleration={state.acceleration}
+    bind:accelerationBoost={state.accelerationBoost}
+    bind:timeMultiplier={state.timeMultiplier}
+    bind:lightsCount={state.lightsCount}
+    bind:objectsCount={state.objectsCount}
+></Menu>
 
 <style>
-    #fpsMeter {
-        display: block;
-        color: white;
-        font-size: 16px;
-        font-family: 'Courier New', Courier, monospace;
-        position: fixed;
-        right: 10px;
-        top: 10px;
+    canvas {
+        width: 100vw;
+        height: 100vh;
     }
 </style>

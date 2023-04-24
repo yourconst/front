@@ -23,10 +23,18 @@ export class Vector3 {
         return new Vector3(this.x, this.y, this.z);
     }
 
-    putToArray(array: ArrayBufferView | Array<number>, offset = 0) {
-        array[offset + 0] = this.x;
-        array[offset + 1] = this.y;
-        array[offset + 2] = this.z;
+    isEquals(v: Vector3) {
+        return this.x === v.x && this.y === v.y && this.z === v.z;
+    }
+
+    isEqualsN(x = this.x, y = this.y, z = this.z) {
+        return (this.x === x) && (this.y === y) && (this.z === z);
+    }
+
+    putToArray(array: ArrayBufferView | Array<number>, offset = 0, relativeTo?: Vector3) {
+        array[offset + 0] = this.x - (relativeTo?.x || 0);
+        array[offset + 1] = this.y - (relativeTo?.y || 0);
+        array[offset + 2] = this.z - (relativeTo?.z || 0);
 
         return offset + 3;
     }
@@ -39,7 +47,7 @@ export class Vector3 {
         return this;
     }
 
-    setN(x = 0, y = 0, z = 0) {
+    setN(x = this.x, y = this.y, z = this.z) {
         this.x = x;
         this.y = y;
         this.z = z;
