@@ -2,7 +2,7 @@
     import * as customLaws from './customLaws';
     import CustomLawRange from "./CustomLawRange.svelte";
 
-    export let show: boolean;
+    export let show = false;
 
     export let pause: boolean;
 
@@ -12,6 +12,8 @@
     export let acceleration: number;
     export let accelerationBoost: number;
     export let timeMultiplier: number;
+    export let lightOrbitPeriod: number;
+    export let lightOrbitRadius: number;
     export let lightsCount: number;
     export let objectsCount: number;
 </script>
@@ -36,7 +38,7 @@
         </tr>
         <tr>
             <td>Acceleration</td>
-            <td><CustomLawRange bind:value={acceleration} min={1e5} max={1e8} step='any' law={customLaws.linear} /></td>
+            <td><CustomLawRange bind:value={acceleration} min={1} max={1e8} step='any' law={customLaws.linear} /></td>
         </tr>
         <tr>
             <td>Acceleration Boost</td>
@@ -45,6 +47,14 @@
         <tr>
             <td>Time flow</td>
             <td><CustomLawRange bind:value={timeMultiplier} min={0} max={100} step='any' law={customLaws.createPow(3)} /></td>
+        </tr>
+        <tr>
+            <td>Light orbit period</td>
+            <td><CustomLawRange bind:value={lightOrbitPeriod} min={0} max={100} step='any' law={customLaws.createPow(2)} /></td>
+        </tr>
+        <tr>
+            <td>Light orbit radius</td>
+            <td><CustomLawRange bind:value={lightOrbitRadius} min={1e4} max={1e6} step='any' law={customLaws.createPow(2)} /></td>
         </tr>
         <tr>
             <td>Lights</td>

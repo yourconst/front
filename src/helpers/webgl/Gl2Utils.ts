@@ -1,7 +1,35 @@
+import { Vector4 } from "../../libs/math/Vector4";
+import { Helpers } from "../common";
+
 type Gl2ShaderType = WebGL2RenderingContext['VERTEX_SHADER'] |
     WebGL2RenderingContext['FRAGMENT_SHADER'];
 
-export class Gl2Utils {
+type TEXTURE_INDEX =
+    0|1|2|3|4|5|6|7|8|9|
+    10|11|12|13|14|15|16|17|18|19|
+    20|21|22|23|24|25|26|27|28|29|
+    30|31;
+
+interface TextureConfig<TextureName extends string> {
+    readonly name: TextureName;
+    readonly index: TEXTURE_INDEX;
+    readonly type: number;
+    readonly texture: WebGLTexture;
+    readonly level: number;
+    readonly internalFormat: number;
+    readonly border: number;
+    readonly srcFormat: number;
+    readonly srcType: number;
+    readonly mipMap: boolean;
+    width: number;
+    height: number;
+    readonly maxWidth?: number;
+    readonly maxHeight?: number;
+}
+
+export class Gl2Utils<TextureName extends string = null> {
+    private readonly texturesIndicesMap = new Map<TextureName, TextureConfig<TextureName>>();
+
     constructor(public gl: WebGL2RenderingContext) { }
 
 
@@ -14,6 +42,8 @@ export class Gl2Utils {
             console.log(this.gl.getShaderInfoLog(shader));
             throw "Shader compile failed with: " + this.gl.getShaderInfoLog(shader);
         }
+
+        // alert('Compiled');
 
         return shader;
     }
@@ -50,7 +80,7 @@ export class Gl2Utils {
     getUniformLocation(program: WebGLProgram, name: string) {
         const attributeLocation = this.gl.getUniformLocation(program, name);
         if (attributeLocation === -1) {
-          throw "Cannot find attribute " + name + ".";
+          throw "Cannot find uniform " + name + ".";
         }
         return attributeLocation;
     }
@@ -63,7 +93,7 @@ export class Gl2Utils {
         return glBuffer;
     }
 
-    getUniformBuffer(buffer: BufferSource, program: WebGLProgram, name: string) {
+    getUniformBuffer(program: WebGLProgram, name: string, buffer: BufferSource) {
         const boundLocation = this.gl.getUniformBlockIndex(program, name);
 
         const glBuffer = this.gl.createBuffer();
@@ -82,5 +112,223 @@ export class Gl2Utils {
         this.gl.bufferData(this.gl.UNIFORM_BUFFER, buffer, this.gl.DYNAMIC_DRAW);
         // this.gl.bufferSubData(this.gl.UNIFORM_BUFFER, 0, <any> buffer, 0, 16);
         // this.gl.bindBuffer(this.gl.UNIFORM_BUFFER, null);
+    }
+
+    createTexture(options: {
+        name: TextureName;
+        baseColor?: Vector4;
+        mipMap?: boolean;
+        maxWidth?: number;
+        maxHeight?: number;
+    }) {
+        options.baseColor ??= new Vector4(0.5, 0.5, 0.5, 1.0);
+        options.mipMap ??= false;
+
+        const type = this.gl.TEXTURE_2D;
+        const texture = this.gl.createTexture();
+        this.gl.bindTexture(type, texture);
+
+        const config: TextureConfig<TextureName> = {
+            name: options.name,
+            index: this.getTextureIndex(options.name),
+            type,
+            texture,
+            level: 0,
+            internalFormat: this.gl.RGBA,
+            width: 1,
+            height: 1,
+            border: 0,
+            srcFormat: this.gl.RGBA,
+            srcType: this.gl.UNSIGNED_BYTE,
+            mipMap: options.mipMap,
+            maxWidth: options.maxWidth,
+            maxHeight: options.maxHeight,
+        };
+
+        const pixel = config.srcType === this.gl.UNSIGNED_BYTE ?
+            options.baseColor.getNormBytes() :
+            options.baseColor.getNormFloats();
+
+        this.gl.texImage2D(
+            this.gl.TEXTURE_2D,
+            config.level,
+            config.internalFormat,
+            config.width,
+            config.height,
+            config.border,
+            config.srcFormat,
+            config.srcType,
+            pixel
+        );
+
+        this.texturesIndicesMap.set(config.name, config);
+
+        return config;
+    }
+
+    async loadTexture(config: TextureConfig<TextureName>, url: string) {
+        const promise = new Helpers.PromiseManaged<TextureConfig<TextureName>>();
+
+        const image = new Image();
+        // image.crossOrigin = "anonymous";
+
+        image.onload = () => {
+            let source: HTMLImageElement | HTMLCanvasElement | OffscreenCanvas = image;
+
+            if (config.maxWidth && config.maxHeight && (
+                image.width > config.maxWidth ||
+                image.height > config.maxHeight
+            )) {
+                const factor = Math.max(
+                    image.width / config.maxWidth,
+                    image.height / config.maxHeight,
+                );
+
+                const canvas = Helpers.createOffscreenCanvas(
+                    (image.width / factor) >> 0,
+                    (image.height / factor) >> 0,
+                );
+
+                canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+
+                source = canvas;
+            }
+
+            config.width = source.width;
+            config.height = source.height;
+
+            this.gl.bindTexture(config.type, config.texture);
+            this.gl.texImage2D(
+                config.type,
+                config.level,
+                config.internalFormat,
+                config.srcFormat,
+                config.srcType,
+                source,
+            );
+            
+            if (config.mipMap && Helpers.isPow2(image.width) && Helpers.isPow2(image.height)) {
+                this.gl.generateMipmap(config.type);
+            } else {
+                this.gl.texParameteri(config.type, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
+                this.gl.texParameteri(config.type, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
+                // this.gl.texParameteri(config.type, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
+                this.gl.texParameteri(config.type, this.gl.TEXTURE_MIN_FILTER, this.gl.NEAREST);
+
+                // glTexParameterf(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_WRAP_S, GL_CLAMP); 
+                // glTexParameterf(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_WRAP_T, GL_CLAMP);
+            }
+
+            promise.resolve(config);
+        };
+
+        image.onerror = (error) => {
+            alert(error);
+            promise.reject(error);
+        };
+
+        image.src = url;
+
+        return promise.promise;
+    }
+
+    bindTexture(config: TextureConfig<TextureName>) {
+        if (!config.texture) {
+            return;
+        }
+
+        this.gl.activeTexture(this.gl[`TEXTURE${config.index}`]);
+        this.gl.bindTexture(config.type, config.texture);
+    }
+
+    rebindTextures() {
+        for (const config of this.texturesIndicesMap.values()) {
+            this.bindTexture(config);
+        }
+    }
+
+    async createLoadBindTextures(dict: Record<TextureName, string>, options?: {
+        program: WebGLProgram;
+        samplersNamePrefix: string;
+        maxWidth?: number;
+        maxHeight?: number;
+    }) {
+        const entries: [TextureName, string][] = <any> Object.entries(dict);
+        
+        if (entries.length + this.getTexturesCount() > 32) {
+            throw new Error(
+                `Too many textures (${entries.length} + ${this.getTexturesCount()}). Max: 32`,
+            );
+        }
+
+        if (options) {
+            this.initSamplersArray(options.program, options.samplersNamePrefix, 32);
+        }
+
+        for (const [name, url] of entries) {
+            const config = this.createTexture({
+                name,
+                maxWidth: options?.maxWidth,
+                maxHeight: options?.maxHeight,
+            });
+
+            await this.loadTexture(config, url);
+            // this.bindTexture(config);
+
+            // TODO: try to understand
+            this.rebindTextures();
+        }
+    }
+
+    getTextureIndex(name: TextureName) {
+        const config = this.texturesIndicesMap.get(name);
+
+        if (!config) {
+            const index = <TEXTURE_INDEX> this.getTexturesCount();
+            this.texturesIndicesMap.set(name, <any>{ index });
+            
+            return index;
+        }
+
+        return config.index;
+    }
+
+    setFirstTextureIndex(name: TextureName) {
+        if (this.texturesIndicesMap.size > 0) {
+            throw new Error();
+        }
+
+        return this.getTextureIndex(name);
+    }
+
+    getTexturesIndexes() {
+        return <Record<TextureName, TEXTURE_INDEX>> Object.fromEntries(
+            [...this.texturesIndicesMap.entries()].map(e => [e[0], e[1].index]),
+        );
+    }
+
+    getRandomTextureIndex(from = 0) {
+        return Helpers.randInt(this.getTexturesCount(), from);
+    }
+
+    getTexturesCount() {
+        return this.texturesIndicesMap.size;
+    }
+
+    // TODO: remove
+    initSamplersArray(program: WebGLProgram, prefix: string, count: TEXTURE_INDEX | 32 = <any> this.getTexturesCount()) {
+        count = <TEXTURE_INDEX | 32> (count >> 0);
+
+        if (count < 1 || 32 < count) {
+            throw new Error();
+        }
+
+        const location = this.getUniformLocation(program, prefix);
+        this.gl.uniform1iv(location, new Array(count).fill(0).map((_, i) => i));
+
+        // for (let i = 0; i < count; ++i) {
+        //     const location = this.getUniformLocation(program, `${prefix}[${i}]`);
+        //     this.gl.uniform1i(location, i);
+        // }
     }
 }

@@ -5,27 +5,31 @@
     import { Gl2Utils } from "../../helpers/webgl/Gl2Utils";
     import { Vector2 } from "../../libs/math/Vector2";
     import { Vector3 } from "../../libs/math/Vector3";
-    import { Sphere } from "../../libs/geometry/Sphere";
     import * as SHADERS from "./shaders";
+    import * as TEXTURES from "./textures";
     import { Matrix } from "../../libs/math/Matrix";
     import { HelpersSvelte } from "../../helpers/svelte";
     import { Helpers } from "../../helpers/common";
     import Menu from "./components/Menu.svelte";
     import Fps from "./components/Fps.svelte";
+    import { DrawableSphere, type DrawableSphereOptions } from "../../libs/drawableGeometry/DrawableSphere";
+  import Info from "./components/Info.svelte";
 
     let onFrame: () => number;
     let canvas: HTMLCanvasElement;
-    let ut: Gl2Utils;
+    let ut: Gl2Utils<TEXTURES.TextureName>;
     const state = {
         isDestroyed: false,
         isPause: false,
         isMenu: false,
+        infoText: '',
         program: <WebGLProgram> null,
         attributes: {
             positions: <number> null,
         },
         uniforms: {
             buffer: <WebGLBuffer> null,
+            textures: <WebGLBuffer> null,
         },
         resolution: new Vector3(1, 1, 0.5),
         camera: {
@@ -34,16 +38,12 @@
             d: 1,
             viewDistance: 1e15,
         },
-        objects: <Sphere[]>[],
-        lights: <Sphere[]>[
-            new Sphere(
-                new Vector3(0, 0, 149_600_000_000), 696_340_000, new Vector3(1, 1, 1).multiplyN(2e3),
-            ),
-        ],
+        objects: <DrawableSphere[]>[],
+        lights: <DrawableSphere[]>[],
         objectsCount: 10,
         lightsCount: 2,
-        acceleration: 1e7,
-        accelerationBoost: 5,
+        acceleration: 1e6,
+        accelerationBoost: 10,
         lightLoopPeriod: 5,
         lightLoopRadius: 25000,
         time: 0,
@@ -54,6 +54,13 @@
         state.camera.origin.setN(0, 0, -100000);
         state.camera.angles.setN(0, 0, 0);
         state.camera.d = 1;
+
+        state.lights[0] = new DrawableSphere({
+            center: new Vector3(0, 0, 149_600_000_000),
+            radius: 696_340_000,
+            color: new Vector3(1, 1, 1).multiplyN(2e3),
+            textureIndex: ut.getTextureIndex('sun'),
+        });
     }
 
     const gkm = new GKM<
@@ -176,9 +183,12 @@
         if (state.objectsCount > state.objects.length) {
             const count = state.objectsCount - state.objects.length;
             for (let i=0; i<count; ++i) {
-                state.objects.push(new Sphere(
-                    Vector3.createRandom(10000, -10000), Helpers.rand(2500, 3500), Vector3.createRandom(1, 0.1),
-                ));
+                state.objects.push(new DrawableSphere({
+                    center: Vector3.createRandom(10000, -10000),
+                    radius: Helpers.rand(2500, 3500),
+                    color: Vector3.createRandom(1, 0.1),
+                    textureIndex: ut.getRandomTextureIndex(1),
+                }));
             }
         } else {
             state.objects.length = Math.max(0, state.objectsCount || 0);
@@ -187,17 +197,17 @@
         if (state.lightsCount > state.lights.length) {
             const count = state.lightsCount - state.lights.length;
             for (let i=0; i<count; ++i) {
-                state.lights.push(new Sphere(
-                    Vector3.createRandom(10000, -10000), Helpers.rand(2500, 3500), Vector3.createRandom(20, 0.1),
-                ));
+                state.lights.push(new DrawableSphere({
+                    center: Vector3.createRandom(10000, -10000),
+                    radius: Helpers.rand(2500, 3500),
+                    color: Vector3.createRandom(20, 5),
+                    textureIndex: ut.getRandomTextureIndex(1),
+                }));
             }
         } else {
             state.lights.length = Math.max(0, state.lightsCount || 0);
         }
     }
-
-    // const offscreenCanvas = document.createElement("canvas");
-    // const offscreenCanvasCtx = offscreenCanvas.getContext("2d");
 
     function draw() {
         if (state.isDestroyed) {
@@ -205,8 +215,6 @@
         }
 
         requestAnimationFrame(draw);
-
-        // return;
 
         if (state.isPause) {
             return;
@@ -218,35 +226,30 @@
         const dt = onFrame() / 1000 * state.timeMultiplier;
         state.time += dt;
 
+        // state.infoText = dt.toString();
+
         const { acceleration } = checkKeys();
 
         state.camera.origin.plus(acceleration.multiplyN(/* dt * dt */ 0.016 * 0.016));
 
+        const angleXZ = state.time * (2 * Math.PI) / state.lightLoopPeriod;
         const lightXZ = Vector2.fromAngle(
-            state.time * (2 * Math.PI) / state.lightLoopPeriod,
+            angleXZ,
             state.lightLoopRadius,
         );
 
+        state.lights[0]?.angles.setN(undefined, angleXZ);
         state.lights[1]?.center.setN(lightXZ.x, 0, lightXZ.y);
-        // state.lights[0].center.setN(lightXZ.x, 0, lightXZ.y);
-        // state.lights[1].center.setN(0, lightXZ.y, lightXZ.x);
-        // state.lights[2].center.setN(lightXZ.x, lightXZ.y, -lightXZ.x);
+        state.lights[1]?.angles.setN(undefined, -angleXZ);
 
         const MO = 12;
         const BO = MO + 8;
-        const SS = 8;
+        const SS = 12;
 
         const f32a = new Float32Array(BO + SS * 100);
         const i32a = new Int32Array(f32a.buffer);
 
         const rotationMatrix = Matrix.createRotation3x3FromAnglesVector(state.camera.angles);
-        // const rotationMatrix = Matrix.createRotation3x3FromAngles(
-        //     state.camera.angles.z,
-        //     state.camera.angles.x,
-        //     state.camera.angles.y,
-        // );
-
-        // console.log(rotationMatrix.cells);
 
         rotationMatrix.putToArray(f32a, 0);
 
@@ -260,31 +263,22 @@
         const bodies = [...state.lights, ...state.objects];
 
         for (let i=0; i<bodies.length; ++i) {
-            bodies[i].putToArray(f32a, BO + SS * i, state.camera.origin);
+            const offset = BO + SS * i;
+            bodies[i].putToArray(f32a, offset, state.camera.origin);
+            i32a[offset + 7] = bodies[i].textureIndex;
         }
         
         ut.updateUniformBuffer(state.uniforms.buffer, f32a.buffer);
 
         ut.gl.drawArrays(ut.gl.TRIANGLE_STRIP, 0, 4);
-
-
-        // const r = rotationMatrix.multiplyVector3Column(new Vector3(0, 0, state.camera.d));
-        // // const o = 6;
-        // // const r = new Vector3(rotationMatrix.cells[o+0], rotationMatrix.cells[o+1], rotationMatrix.cells[o+2]);
-
-        // offscreenCanvas.width = canvas.width;
-        // offscreenCanvas.height = canvas.height;
-        // offscreenCanvasCtx.drawImage(canvas,0,0);
-        // const {data: d} = offscreenCanvasCtx.getImageData(0,0, offscreenCanvas.width, offscreenCanvas.height);
-
-        // console.log(r);
-        // console.log(new Vector3(d[0], d[1], d[2]).multiplyN(1 / 255));
-        // console.log(rotationMatrix.cells);
     };
 
-    onMount(() => {
+    onMount(async () => {
+        try {
+        state.infoText = 'WebGL initializing';
         ut = new Gl2Utils(canvas.getContext('webgl2'));
 
+        state.infoText = 'Shaders compiling';
         const program = ut.createProgram({
             use: true,
             shaders: [
@@ -293,9 +287,11 @@
             ],
         });
 
+        state.infoText = 'Getting memory links';
+
         state.program = program;
         state.attributes.positions = ut.getAttribLocation(program, 'position');
-        state.uniforms.buffer = ut.getUniformBuffer(new Float32Array(16), program, 'Info');
+        state.uniforms.buffer = ut.getUniformBuffer(program, 'Info', new Float32Array(16));
 
         ut.bindBuffer(SHADERS.vertex.data);
         ut.gl.enableVertexAttribArray(state.attributes.positions);
@@ -314,7 +310,29 @@
         globalThis['ut'] = ut;
         globalThis['gkm'] = gkm;
 
+        ut.setFirstTextureIndex('space');
+
+        const TEXPART: any = {
+            space: TEXTURES.space,
+            sun: TEXTURES.sun,
+            earth: TEXTURES.earth,
+        }
+
+        state.infoText = 'Loading textures';
+
+        await ut.createLoadBindTextures(TEXTURES, {
+            program,
+            samplersNamePrefix: 'SAMPLER',
+            maxWidth: 512, maxHeight: 512,
+        });
+
+        reset();
+
+        state.infoText = 'Starting';
         draw();
+        } catch (error) {
+            alert('' + error + error.stack);
+        }
     });
 
     onDestroy(() => {
@@ -335,6 +353,11 @@
     on:touchmove={e => {
         e.preventDefault();
 
+//         e.touches[0]['index'] ??= Date.now();
+
+//         state.infoText = `Touches count: ${e.touches?.length.toString()}\n
+// Touch[0] info: ${Object.keys(e.touches[0]['__proto__']).join(', ')}`;
+
         if (e['scale']) {
             zoom(e['scale'] - 1);
         }
@@ -354,12 +377,17 @@
     bind:acceleration={state.acceleration}
     bind:accelerationBoost={state.accelerationBoost}
     bind:timeMultiplier={state.timeMultiplier}
+    bind:lightOrbitPeriod={state.lightLoopPeriod}
+    bind:lightOrbitRadius={state.lightLoopRadius}
     bind:lightsCount={state.lightsCount}
     bind:objectsCount={state.objectsCount}
 ></Menu>
 
+<Info text={state.infoText}></Info>
+
 <style>
     canvas {
+        background: black;
         width: 100vw;
         height: 100vh;
     }

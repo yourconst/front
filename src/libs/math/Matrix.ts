@@ -39,6 +39,7 @@ export class Matrix {
 
     constructor(public sizes: Vector2, public cells: NumberArray) { }
 
+    // TODO: other sizes supporting
     putToArray(array: ArrayBufferView | Array<number>, offset = 0) {
         // for (let i = 0; i < this.cells.length; ++i) {
         //     array[offset + i] = this.cells[i];
@@ -95,8 +96,8 @@ export class Matrix {
         if (2 !== this.sizes.x) { throw new Error(); }
         
         return new Vector2(
-            v2.x * this.cells[0] + v2.y * this.cells[1],
-            v2.x * this.cells[2] + v2.y * this.cells[3],
+            v2.x * this.cells[0] + v2.y * this.cells[2],
+            v2.x * this.cells[1] + v2.y * this.cells[3],
         );
     }
 

@@ -56,6 +56,10 @@ class SleeperChanging {
     
     constructor(private _duration: number) { }
 
+    get isActive() {
+        return !!this._promise;
+    }
+
     getDelay() {
         if (!this._promise) {
             return -1;
@@ -131,5 +135,21 @@ export class Helpers {
 
     static randInt(max: number, min = 0) {
         return Math.trunc(Helpers.rand(max, min));
+    }
+
+    static isPow2(n: number) {
+        return (n & (n - 1)) === 0;
+    }
+
+    static createOffscreenCanvas(width: number, height: number) {
+        if (window['OffscreenCanvas']) {
+            return new OffscreenCanvas(width, height);
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+
+        return canvas;
     }
 }
