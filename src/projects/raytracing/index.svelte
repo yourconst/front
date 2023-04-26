@@ -31,27 +31,27 @@
             buffer: <WebGLBuffer> null,
             textures: <WebGLBuffer> null,
         },
-        resolution: new Vector3(1, 1, 0.5),
+        resolution: new Vector3(1, 1, 0.3),
         camera: {
-            origin: new Vector3(0, 0, -100000),
+            origin: new Vector3(0, 0, -10000),
             angles: new Vector3(),
             d: 1,
             viewDistance: 1e15,
         },
         objects: <DrawableSphere[]>[],
         lights: <DrawableSphere[]>[],
-        objectsCount: 10,
+        objectsCount: 9,
         lightsCount: 2,
         acceleration: 1e6,
         accelerationBoost: 10,
         lightLoopPeriod: 5,
         lightLoopRadius: 25000,
         time: 0,
-        timeMultiplier: 1,
+        timeMultiplier: 0,
     };
 
     function reset() {
-        state.camera.origin.setN(0, 0, -100000);
+        state.camera.origin.setN(0, 0, -50000);
         state.camera.angles.setN(0, 0, 0);
         state.camera.d = 1;
 
@@ -187,7 +187,7 @@
                     center: Vector3.createRandom(10000, -10000),
                     radius: Helpers.rand(2500, 3500),
                     color: Vector3.createRandom(1, 0.1),
-                    textureIndex: ut.getRandomTextureIndex(1),
+                    textureIndex: ut.getModuloNextTextureIndex(state.objects.length, 2),
                 }));
             }
         } else {
@@ -200,8 +200,9 @@
                 state.lights.push(new DrawableSphere({
                     center: Vector3.createRandom(10000, -10000),
                     radius: Helpers.rand(2500, 3500),
-                    color: Vector3.createRandom(20, 5),
-                    textureIndex: ut.getRandomTextureIndex(1),
+                    // color: Vector3.createRandom(20, 5),
+                    color: new Vector3(1.0, 1.0, 1.0).multiplyN(20),
+                    textureIndex: ut.getTextureIndex('sun'),
                 }));
             }
         } else {
@@ -234,7 +235,7 @@
 
         const angleXZ = state.time * (2 * Math.PI) / state.lightLoopPeriod;
         const lightXZ = Vector2.fromAngle(
-            angleXZ,
+            angleXZ - Math.PI / 2,
             state.lightLoopRadius,
         );
 
@@ -266,6 +267,7 @@
             const offset = BO + SS * i;
             bodies[i].putToArray(f32a, offset, state.camera.origin);
             i32a[offset + 7] = bodies[i].textureIndex;
+            f32a[offset + 10] = bodies[i].radius * 2.3;
         }
         
         ut.updateUniformBuffer(state.uniforms.buffer, f32a.buffer);
@@ -276,7 +278,10 @@
     onMount(async () => {
         try {
         state.infoText = 'WebGL initializing';
-        ut = new Gl2Utils(canvas.getContext('webgl2'));
+        ut = new Gl2Utils(<any> canvas.getContext('webgl2', {
+            saveDrawingBuffer: true,
+            preserveDrawingBuffer: true,
+        }));
 
         state.infoText = 'Shaders compiling';
         const program = ut.createProgram({
@@ -310,7 +315,8 @@
         globalThis['ut'] = ut;
         globalThis['gkm'] = gkm;
 
-        ut.setFirstTextureIndex('space');
+        ut.reserveTextureIndex('space', 0);
+        ut.reserveTextureIndex('sun', 1);
 
         const TEXPART: any = {
             space: TEXTURES.space,
@@ -323,7 +329,7 @@
         await ut.createLoadBindTextures(TEXTURES, {
             program,
             samplersNamePrefix: 'SAMPLER',
-            maxWidth: 512, maxHeight: 512,
+            // maxWidth: 512, maxHeight: 512,
         });
 
         reset();

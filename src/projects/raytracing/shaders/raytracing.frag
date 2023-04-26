@@ -13,6 +13,7 @@ struct Sphere {
     vec3 color;
     int textureIndex;
     vec2 angles;
+    float atmosphereRadius;
 };
 
 uniform Info {
@@ -77,16 +78,16 @@ vec4 getTextureTexel(int index, vec2 uv/* , float bias */, const vec3 baseColor)
     return result;
 }
 
-float Sphere_getRayDistance(Sphere s, Ray ray) {
-    vec3 toSphere = ray.origin - s.center;
+float Sphere_getRayDistance(vec3 center, float radius, Ray ray) {
+    vec3 toSphere = ray.origin - center;
 
-    if (length(toSphere) < s.radius) {
-        return 0.0;
+    if (length(toSphere) < radius) {
+        return 0.1;
     }
 
     float a = dot(ray.direction, ray.direction);
     float b = 2.0 * dot(toSphere, ray.direction);
-    float c = dot(toSphere, toSphere) - s.radius*s.radius;
+    float c = dot(toSphere, toSphere) - radius*radius;
     float discriminant = b*b - 4.0*a*c;
 
     if(discriminant > 0.0) {
@@ -97,45 +98,9 @@ float Sphere_getRayDistance(Sphere s, Ray ray) {
     return info.viewDistance;
 }
 
-// float Sphere_getRayDistance(Sphere s, Ray ray) {
-//     vec3 toSphere = ray.origin - s.center;
-
-//     float a = dot(ray.direction, ray.direction);
-//     float b = 2.0 * dot(toSphere, ray.direction);
-//     float c = dot(toSphere, toSphere) - s.radius*s.radius;
-//     float discriminant = b*b - 4.0*a*c;
-
-
-//     if (discriminant < 0.0) {
-//       return info.viewDistance;
-//     }
-
-//     discriminant = sqrt(discriminant);
-//     float t = -b - discriminant;
-
-//     if (t > 0.0001) {
-//         return t / 2.0;
-//     }
-
-//     t = -b + discriminant;
-//     if (t > 0.0001) {
-//         return t / 2.0;
-//     }
-
-//     return info.viewDistance;
-// }
-
-vec3 Sphere_getNormal(Sphere s, vec3 hitPoint) {
-    return (hitPoint - s.center) / s.radius;
-    // vec3 result = (hitPoint - s.center) / s.radius;
-
-    // float m = 1.0;
-
-    // result.x += (result.y + result.z) * m;
-    // result.y += (result.x + result.z) * m;
-    // result.z += (result.y + result.x) * m;
-
-    // return result;
+vec3 Sphere_getNormal(vec3 center, float radius, vec3 hitPoint) {
+    // return (hitPoint - center) / radius;
+    return normalize(hitPoint - center);
 }
 
 // )
@@ -160,60 +125,158 @@ vec2 getUV(vec3 normal, vec2 angles) {
         0.5 + (atan(normal.z, normal.x)) / M_PI2,
         atan(sqrt(normal.x * normal.x + normal.z * normal.z), normal.y) / M_PI
     );
-
-    // return vec2(
-    //     getPositiveModulo(
-    //         0.5 + (angles.x + atan(normal.z, normal.x)) / M_PI2,
-    //         1.0
-    //     ),
-    //     getPositiveModulo(
-    //         (angles.y + atan(sqrt(normal.x * normal.x + normal.z * normal.z), normal.y)) / M_PI,
-    //         1.0
-    //     )
-    // );
 }
 
+vec3 getSkyBoxHitColor(vec3 rayDirection) {
+    vec3 result = getTextureTexel(
+        0,
+        getUV(rayDirection, vec2(0.0, 0.0)),
+        // 1.0,
+        vec3(0.0, 0.0, 0.0)
+    ).xyz;
 
-vec3 getHitColor(Ray ray) {
-    int hitIndex = -1;
-    float distance = info.viewDistance;
+    if (length(result) > 1.0) {
+        return vec3(0.1, 0.1, 0.1);
+    } else {
+        return vec3(0.0, 0.0, 0.0);
+    }
+}
+
+vec3 getHitReflectColor(vec3 hitPoint, float hitDistance, vec3 hitColor, int hitIndex, vec3 hitNormal, bool faceToLight) {
+    vec3 reflectColor = vec3(0.0, 0.0, 0.0);
+
+    for (int j=0; j<info.lightsCount; ++j) {
+        Ray lightRay = Ray(hitPoint, normalize(info.spheres[j].center - hitPoint));
+        float lightCos = faceToLight ? 1.0 : dot(lightRay.direction, hitNormal);
+
+        if (lightCos < 0.0) {
+            continue;
+        }
+
+        float lightDistance = Sphere_getRayDistance(
+            info.spheres[j].center,
+            info.spheres[j].radius,
+            lightRay
+        );
+
+        bool inDark = false;
+
+        for (int i=info.lightsCount; i<info.count; ++i) if (i != hitIndex) {
+            float _distance = Sphere_getRayDistance(
+                info.spheres[i].center,
+                info.spheres[i].radius,
+                lightRay
+            );
+    
+            if (_distance < lightDistance) {
+                inDark = true;
+                break;
+            }
+        }
+
+        if (!inDark) {
+            float lightDistanceFactor = min(1.0, pow(lightDistance / info.spheres[j].radius, -2.0));
+            // TODO
+            float viewDistanceFactor = min(1.0, pow(hitDistance / info.spheres[j].radius, -1.0));
+            reflectColor += hitColor * info.spheres[j].color * lightCos * (lightDistanceFactor * viewDistanceFactor);
+        }
+    }
+
+    return reflectColor;
+}
+
+struct BodyHitDistance {
+    int index;
+    float distance;
+};
+
+
+vec3 getHitColorWithAtmosphere(Ray ray) {
+    BodyHitDistance hits[100];
+
+    BodyHitDistance diffuseHit = BodyHitDistance(-1, info.viewDistance);
+    int hitsCount = 0;
+
     for (int i=0; i<info.count; ++i) {
-        float _distance = Sphere_getRayDistance(info.spheres[i], ray);
+        float distance = Sphere_getRayDistance(
+            info.spheres[i].center,
+            info.spheres[i].radius,
+            ray
+        );
 
-        if (_distance < distance) {
-            distance = _distance;
-            hitIndex = i;
+        if (distance < diffuseHit.distance) {
+            diffuseHit.distance = distance;
+            diffuseHit.index = i;
+        }
+
+        distance = Sphere_getRayDistance(
+            info.spheres[i].center,
+            info.spheres[i].atmosphereRadius,
+            ray
+        );
+
+        if (distance < diffuseHit.distance) {
+            hits[hitsCount] = BodyHitDistance(i, distance);
+            ++hitsCount;
         }
     }
 
-    if (hitIndex == -1) {
-        // return vec3(0.0, 0.0, 0.0);
+    vec3 result = vec3(0.0, 0.0, 0.0);
 
-        vec3 result = getTextureTexel(
-            0,
-            getUV(ray.direction, vec2(0.0, 0.0)),
-            // 1.0,
-            vec3(0.0, 0.0, 0.0)
-        ).xyz;
-
-        if (length(result) > 0.9) {
-            // return result;
-            return vec3(0.1, 0.1, 0.1);
-        } else {
-            return vec3(0.0, 0.0, 0.0);
+    for (int i=0; i<hitsCount; ++i) {
+        if (diffuseHit.distance < hits[i].distance) {
+            continue;
         }
 
-        // vec2 uv = getUV(ray.direction, vec2(0.0, 0.0));
+        float distance = hits[i].distance;
+        int hitIndex = hits[i].index;
 
-        // if (int(uv.x * 10000.0) % 11 == 0 && int(uv.y * 100000.0) % 11 == 0) {
-        //     return vec3(1.0, 1.0, 1.0);
-        // } else {
-        //     return vec3(0.0, 0.0, 0.0);
-        // }
+        vec3 hitPoint = ray.origin + ray.direction * distance;
+        vec3 hitNormal = Sphere_getNormal(
+            info.spheres[hitIndex].center,
+            info.spheres[hitIndex].radius,
+            hitPoint
+        );
+        float cos = -dot(ray.direction, hitNormal);
+        float distanceFactor = min(1.0, pow(distance / info.spheres[hitIndex].radius, -2.0));
+
+        vec3 hitColor = normalize(info.spheres[hitIndex].color);
+
+        float sin = pow(1.0 - cos*cos, 0.5);
+        float ratio = info.spheres[hitIndex].atmosphereRadius / info.spheres[hitIndex].radius;
+        float position = sin * ratio - 1.0;
+        if (position < 0.0) {
+            position = -position * (ratio - 1.0);
+        } else
+        if (distance < 1.0) {
+            position = 0.0;
+        }
+        float reverse = abs(position) / /* max */(/* 1.0,  */ratio - 1.0);
+        float multiplier = pow(1.0 - reverse, 4.0);
+
+        if (hitIndex < info.lightsCount) {
+            result += hitColor * multiplier * distanceFactor;
+            continue;
+        }
+
+        vec3 reflectColor = getHitReflectColor(hitPoint, distance, hitColor, hitIndex, hitNormal, false);
+
+        result += reflectColor * multiplier;
     }
+
+    if (diffuseHit.index == -1) {
+        return result + getSkyBoxHitColor(ray.direction);
+    }
+
+    int hitIndex = diffuseHit.index;
+    float distance = diffuseHit.distance;
 
     vec3 hitPoint = ray.origin + ray.direction * distance;
-    vec3 hitNormal = Sphere_getNormal(info.spheres[hitIndex], hitPoint);
+    vec3 hitNormal = Sphere_getNormal(
+        info.spheres[hitIndex].center,
+        info.spheres[hitIndex].radius,
+        hitPoint
+    );
     float cos = -dot(ray.direction, hitNormal);
     float distanceFactor = min(1.0, pow(distance / info.spheres[hitIndex].radius, -2.0));
 
@@ -229,39 +292,62 @@ vec3 getHitColor(Ray ray) {
     // hitColor = info.spheres[hitIndex].color;
 
     if (hitIndex < info.lightsCount) {
-        return hitColor * info.spheres[hitIndex].color * cos * (0.05 + distanceFactor);
+        return result + hitColor/*  * info.spheres[hitIndex].color */ * cos * (0.05 + distanceFactor);
     }
 
-    vec3 reflectColor = vec3(0.0, 0.0, 0.0);
+    vec3 reflectColor = getHitReflectColor(hitPoint, distance, hitColor, hitIndex, hitNormal, false);
 
-    for (int j=0; j<info.lightsCount; ++j) {
-        Ray lightRay = Ray(hitPoint, normalize(info.spheres[j].center - hitPoint));
-        float lightCos = dot(lightRay.direction, hitNormal);
+    return result + (hitColor * 0.01 * distanceFactor + reflectColor) * cos;
+}
 
-        if (lightCos < 0.0) {
-            continue;
-        }
 
-        float lightDistance = Sphere_getRayDistance(info.spheres[j], lightRay);
+vec3 getHitColor(Ray ray) {
+    int hitIndex = -1;
+    float distance = info.viewDistance;
+    for (int i=0; i<info.count; ++i) {
+        float _distance = Sphere_getRayDistance(
+            info.spheres[i].center,
+            info.spheres[i].radius,
+            ray
+        );
 
-        bool inDark = false;
-
-        for (int i=info.lightsCount; i<info.count; ++i) if (i != hitIndex) {
-            float _distance = Sphere_getRayDistance(info.spheres[i], lightRay);
-    
-            if (_distance < lightDistance) {
-                inDark = true;
-                break;
-            }
-        }
-
-        if (!inDark) {
-            float lightDistanceFactor = min(1.0, pow(lightDistance / info.spheres[j].radius, -2.0));
-            // TODO
-            // float viewDistanceFactor = min(1.0, pow(distance / info.spheres[j].radius, -2.0));
-            reflectColor += hitColor * info.spheres[j].color * lightCos * (lightDistanceFactor /* * viewDistanceFactor */);
+        if (_distance < distance) {
+            distance = _distance;
+            hitIndex = i;
         }
     }
+
+    if (hitIndex == -1) {
+        // return vec3(0.0, 0.0, 0.0);
+
+        return getSkyBoxHitColor(ray.direction);
+    }
+
+    vec3 hitPoint = ray.origin + ray.direction * distance;
+    vec3 hitNormal = Sphere_getNormal(
+        info.spheres[hitIndex].center,
+        info.spheres[hitIndex].radius,
+        hitPoint
+    );
+    float cos = -dot(ray.direction, hitNormal);
+    float distanceFactor = min(1.0, pow(distance / info.spheres[hitIndex].radius, -2.0));
+
+    vec3 hitColor = getTextureTexel(
+        info.spheres[hitIndex].textureIndex,
+        getUV(hitNormal, info.spheres[hitIndex].angles),
+        // 1.0,
+        info.spheres[hitIndex].color
+    ).xyz;
+
+    // Fake depth texture
+    // hitNormal = normalize(hitNormal + hitColor * 0.5);
+    // hitColor = info.spheres[hitIndex].color;
+
+    if (hitIndex < info.lightsCount) {
+        return hitColor/*  * info.spheres[hitIndex].color */ * cos * (0.05 + distanceFactor);
+    }
+
+    vec3 reflectColor = getHitReflectColor(hitPoint, distance, hitColor, hitIndex, hitNormal, false);
 
     return (hitColor * 0.01 * distanceFactor + reflectColor) * cos;
 }
@@ -274,11 +360,10 @@ void main() {
 
     Ray ray = Ray(vec3(0.0, 0.0, 0.0), normalize(dir3));
 
-    vec3 rawColor = getHitColor(ray);
+    // vec3 rawColor = getHitColor(ray);
+    vec3 rawColor = getHitColorWithAtmosphere(ray);
 
     rawColor = pow(rawColor, vec3(1.0/2.2, 1.0/2.2, 1.0/2.2));
-
-    // rawColor = clamp(rawColor, vec3(0.0, 0.0, 0.0), vec3(1.0, 1.0, 1.0));
 
     float maxPart = max(rawColor.x, max(rawColor.y, rawColor.z));
 

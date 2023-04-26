@@ -38,7 +38,7 @@
         </tr>
         <tr>
             <td>Acceleration</td>
-            <td><CustomLawRange bind:value={acceleration} min={1} max={1e8} step='any' law={customLaws.linear} /></td>
+            <td><CustomLawRange bind:value={acceleration} min={1} max={1e8} step='any' law={customLaws.createPow(2)} /></td>
         </tr>
         <tr>
             <td>Acceleration Boost</td>
@@ -58,11 +58,11 @@
         </tr>
         <tr>
             <td>Lights</td>
-            <td><CustomLawRange bind:value={lightsCount} min={0} max={10} step={1} law={customLaws.createPow(2)} /></td>
+            <td><CustomLawRange bind:value={lightsCount} min={0} max={10} step={1} law={customLaws.linear} /></td>
         </tr>
         <tr>
             <td>Objects</td>
-            <td><CustomLawRange bind:value={objectsCount} min={0} max={100} step={1} law={customLaws.createPow(2)} /></td>
+            <td><CustomLawRange bind:value={objectsCount} min={0} max={100} step={1} law={customLaws.linear} /></td>
         </tr>
     </table>
 </div>
@@ -90,14 +90,6 @@
 
         color: white;
         font-family: 'Courier New', Courier, monospace;
-    }
-
-    input[type=number] {
-        width: 50px;
-    }
-
-    input[type=range] {
-        width: 150px;
     }
 
     #closeButton {

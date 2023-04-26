@@ -2,7 +2,7 @@
 export { default as space } from './space.jpg';
 
 // export const milkiway = 'https://www.solarsystemscope.com/textures/download/8k_stars_milky_way.jpg';
-export { default as milkiway } from './milkiway.jpg';
+// export { default as milkiway } from './milkiway.jpg';
 
 // export const sun = 'https://www.solarsystemscope.com/textures/download/8k_sun.jpg';
 export { default as sun } from './sun.jpg';

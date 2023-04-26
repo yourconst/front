@@ -28,7 +28,7 @@ interface TextureConfig<TextureName extends string> {
 }
 
 export class Gl2Utils<TextureName extends string = null> {
-    private readonly texturesIndicesMap = new Map<TextureName, TextureConfig<TextureName>>();
+    private readonly texturesMap = new Map<TextureName, TextureConfig<TextureName>>();
 
     constructor(public gl: WebGL2RenderingContext) { }
 
@@ -72,7 +72,7 @@ export class Gl2Utils<TextureName extends string = null> {
     getAttribLocation(program: WebGLProgram, name: string) {
         const attributeLocation = this.gl.getAttribLocation(program, name);
         if (attributeLocation === -1) {
-          throw "Cannot find attribute " + name + ".";
+          throw new Error("Cannot find attribute " + name + ".");
         }
         return attributeLocation;
     }
@@ -80,7 +80,7 @@ export class Gl2Utils<TextureName extends string = null> {
     getUniformLocation(program: WebGLProgram, name: string) {
         const attributeLocation = this.gl.getUniformLocation(program, name);
         if (attributeLocation === -1) {
-          throw "Cannot find uniform " + name + ".";
+          throw new Error("Cannot find uniform " + name + ".");
         }
         return attributeLocation;
     }
@@ -161,7 +161,7 @@ export class Gl2Utils<TextureName extends string = null> {
             pixel
         );
 
-        this.texturesIndicesMap.set(config.name, config);
+        this.texturesMap.set(config.name, config);
 
         return config;
     }
@@ -242,7 +242,7 @@ export class Gl2Utils<TextureName extends string = null> {
     }
 
     rebindTextures() {
-        for (const config of this.texturesIndicesMap.values()) {
+        for (const config of this.texturesMap.values()) {
             this.bindTexture(config);
         }
     }
@@ -253,6 +253,8 @@ export class Gl2Utils<TextureName extends string = null> {
         maxWidth?: number;
         maxHeight?: number;
     }) {
+        // TODO: remove
+        return;
         const entries: [TextureName, string][] = <any> Object.entries(dict);
         
         if (entries.length + this.getTexturesCount() > 32) {
@@ -281,11 +283,13 @@ export class Gl2Utils<TextureName extends string = null> {
     }
 
     getTextureIndex(name: TextureName) {
-        const config = this.texturesIndicesMap.get(name);
+        // TODO: remove
+        return -1;
+        const config = this.texturesMap.get(name);
 
         if (!config) {
             const index = <TEXTURE_INDEX> this.getTexturesCount();
-            this.texturesIndicesMap.set(name, <any>{ index });
+            this.texturesMap.set(name, <any>{ index });
             
             return index;
         }
@@ -293,9 +297,17 @@ export class Gl2Utils<TextureName extends string = null> {
         return config.index;
     }
 
-    setFirstTextureIndex(name: TextureName) {
-        if (this.texturesIndicesMap.size > 0) {
-            throw new Error();
+    reserveTextureIndex(name: TextureName, index: number) {
+        // TODO: remove
+        return -1;
+        const existingConfig = this.texturesMap.get(name);
+
+        if (existingConfig && existingConfig.index !== index) {
+            throw new Error(`Texture '${name}' already exists with other index ${index}`);
+        }
+
+        if (this.texturesMap.size !== index) {
+            throw new Error(`Cannot bind texture '${name}' to index ${index}`);
         }
 
         return this.getTextureIndex(name);
@@ -303,7 +315,7 @@ export class Gl2Utils<TextureName extends string = null> {
 
     getTexturesIndexes() {
         return <Record<TextureName, TEXTURE_INDEX>> Object.fromEntries(
-            [...this.texturesIndicesMap.entries()].map(e => [e[0], e[1].index]),
+            [...this.texturesMap.entries()].map(e => [e[0], e[1].index]),
         );
     }
 
@@ -311,8 +323,19 @@ export class Gl2Utils<TextureName extends string = null> {
         return Helpers.randInt(this.getTexturesCount(), from);
     }
 
+    getModuloNextTextureIndex(objectsCount: number, excludeFirst = 0) {
+        const base = this.getTexturesCount() - excludeFirst;
+        const result = excludeFirst + (objectsCount % base);
+
+        if (result < 0 || this.getTexturesCount() < result) {
+            return -1;
+        }
+
+        return result;
+    }
+
     getTexturesCount() {
-        return this.texturesIndicesMap.size;
+        return this.texturesMap.size;
     }
 
     // TODO: remove
