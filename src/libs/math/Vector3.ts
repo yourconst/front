@@ -39,6 +39,46 @@ export class Vector3 {
         return offset + 3;
     }
 
+    maxSet(v: Vector3) {
+        this.x = Math.max(this.x, v.x);
+        this.y = Math.max(this.y, v.y);
+        this.z = Math.max(this.z, v.z);
+
+        return this;
+    }
+
+    minSet(v: Vector3) {
+        this.x = Math.min(this.x, v.x);
+        this.y = Math.min(this.y, v.y);
+        this.z = Math.min(this.z, v.z);
+
+        return this;
+    }
+
+    maxSetN(x: number, y: number, z: number) {
+        this.x = Math.max(this.x, x);
+        this.y = Math.max(this.y, y);
+        this.z = Math.max(this.z, z);
+
+        return this;
+    }
+
+    minSetN(x: number, y: number, z: number) {
+        this.x = Math.min(this.x, x);
+        this.y = Math.min(this.y, y);
+        this.z = Math.min(this.z, z);
+
+        return this;
+    }
+
+    moduloN(n: number) {
+        this.x %= n;
+        this.y %= n;
+        this.z %= n;
+
+        return this;
+    }
+
     set(v: Vector3) {
         this.x = v.x;
         this.y = v.y;
@@ -61,6 +101,14 @@ export class Vector3 {
 
     length() {
         return Math.sqrt(this.length2());
+    }
+
+    distance2To(v: Vector3) {
+        return this.clone().minus(v).length2();
+    }
+
+    distanceTo(v: Vector3) {
+        return this.clone().minus(v).length();
     }
 
     multiplyN(n: number) {
@@ -91,6 +139,22 @@ export class Vector3 {
         return this;
     }
 
+    minus(v: Vector3) {
+        this.x -= v.x;
+        this.y -= v.y;
+        this.z -= v.z;
+
+        return this;
+    }
+
+    minusN(x = 0, y = 0, z = 0) {
+        this.x -= x;
+        this.y -= y;
+        this.z -= z;
+
+        return this;
+    }
+
     rotateByAngles(xz: number, yz: number) {
         let { x, y, z } = this;
         const cosxz = Math.cos(xz), sinxz = Math.sin(xz);
@@ -106,5 +170,17 @@ export class Vector3 {
         this.z = y * sinyz + z * cosyz;
 
         return this;
+    }
+
+    dot(v: Vector3) {
+        return this.x * v.x + this.y * v.y + this.z * v.z;
+    }
+
+    cross(v: Vector3) {
+        return new Vector3(
+            this.y * v.z - this.z * v.y,
+            this.z * v.x - this.x * v.z,
+            this.x * v.y - this.y * v.x,
+        );
     }
 }

@@ -46,7 +46,7 @@
         </tr>
         <tr>
             <td>Time flow</td>
-            <td><CustomLawRange bind:value={timeMultiplier} min={0} max={100} step='any' law={customLaws.createPow(3)} /></td>
+            <td><CustomLawRange bind:value={timeMultiplier} min={0} max={1000} step='any' law={customLaws.createPow(3)} /></td>
         </tr>
         <tr>
             <td>Light orbit period</td>

@@ -8,12 +8,24 @@
     import * as SHADERS from "./shaders";
     import * as TEXTURES from "./textures";
     import { Matrix } from "../../libs/math/Matrix";
-    import { HelpersSvelte } from "../../helpers/svelte";
     import { Helpers } from "../../helpers/common";
     import Menu from "./components/Menu.svelte";
     import Fps from "./components/Fps.svelte";
-    import { DrawableSphere, type DrawableSphereOptions } from "../../libs/drawableGeometry/DrawableSphere";
-  import Info from "./components/Info.svelte";
+    import type { DrawableSphere } from "../../libs/drawableGeometry/DrawableSphere";
+    import Info from "./components/Info.svelte";
+    import { Camera3 } from "../../libs/render/Camera3";
+    import { OBJECTS } from "./configs/objects";
+    import type { RigidBody3 } from "../../libs/physics/RigidBody3";
+    import { PhysicsEngine3 } from "../../libs/physics/PhysicsEngine3";
+
+    const CAMERA_OBJ = Camera3.createWithBody({
+        origin: new Vector3(0, 0, -10000),
+        angles: new Vector3(),
+        d: 1,
+        distance: 1e15,
+    });
+
+    const ENGINE = new PhysicsEngine3();
 
     let onFrame: () => number;
     let canvas: HTMLCanvasElement;
@@ -31,42 +43,38 @@
             buffer: <WebGLBuffer> null,
             textures: <WebGLBuffer> null,
         },
-        resolution: new Vector3(1, 1, 0.3),
-        camera: {
-            origin: new Vector3(0, 0, -10000),
-            angles: new Vector3(),
-            d: 1,
-            viewDistance: 1e15,
-        },
-        objects: <DrawableSphere[]>[],
-        lights: <DrawableSphere[]>[],
+        resolution: new Vector3(1, 1, 0.5),
+        camera: CAMERA_OBJ.camera,
+        CAMERA_OBJ,
+        OBJECTS,
+        ENGINE,
+        objects: <RigidBody3[]>[],
+        lights: <RigidBody3[]>[],
         objectsCount: 9,
-        lightsCount: 2,
-        acceleration: 1e6,
+        lightsCount: 1,
+        acceleration: Infinity, // 1e6,
         accelerationBoost: 10,
         lightLoopPeriod: 5,
         lightLoopRadius: 25000,
         time: 0,
-        timeMultiplier: 0,
+        timeMultiplier: 1,
     };
 
     function reset() {
-        state.camera.origin.setN(0, 0, -50000);
-        state.camera.angles.setN(0, 0, 0);
+        state.camera.origin.setN(0, 0, 1000000000);
+        state.camera.angles.setN(0, Math.PI, 0);
         state.camera.d = 1;
 
-        state.lights[0] = new DrawableSphere({
-            center: new Vector3(0, 0, 149_600_000_000),
-            radius: 696_340_000,
-            color: new Vector3(1, 1, 1).multiplyN(2e3),
-            textureIndex: ut.getTextureIndex('sun'),
-        });
+        CAMERA_OBJ.body.velocity.setN(0, 0, 0);
+
+        state.lights.length = 0;
+        state.objects.length = 0;
     }
 
     const gkm = new GKM<
         'moveFront' | 'moveBack' | 'moveLeft' | 'moveRight' |
         'moveUp' | 'moveDown' |
-        'moveFast' |
+        'moveFast' | 'moveStop' |
         'zoomIn' | 'zoomOut' |
         'pause' | 'menu' | 'reset' |
         'viewZ+' | 'viewZ-',
@@ -87,6 +95,7 @@
             Escape: 'menu',
             KeyP: 'pause', GAMEPAD_GUIDE: 'pause',
             KeyR: 'reset', GAMEPAD_START: 'reset',
+            KeyQ: 'moveStop',
         },
         axesBindings: {
             MOUSE_MOVEMENT_X: 'viewX',
@@ -129,6 +138,9 @@
         } else
         if (key === 'reset') {
             reset();
+        } else
+        if (key === 'moveStop') {
+            CAMERA_OBJ.body.velocity.setN(0, 0, 0);
         }
     });
 
@@ -180,33 +192,56 @@
     }
 
     function checkGui() {
-        if (state.objectsCount > state.objects.length) {
-            const count = state.objectsCount - state.objects.length;
-            for (let i=0; i<count; ++i) {
-                state.objects.push(new DrawableSphere({
-                    center: Vector3.createRandom(10000, -10000),
-                    radius: Helpers.rand(2500, 3500),
-                    color: Vector3.createRandom(1, 0.1),
-                    textureIndex: ut.getModuloNextTextureIndex(state.objects.length, 2),
-                }));
-            }
-        } else {
-            state.objects.length = Math.max(0, state.objectsCount || 0);
-        }
-
         if (state.lightsCount > state.lights.length) {
             const count = state.lightsCount - state.lights.length;
             for (let i=0; i<count; ++i) {
-                state.lights.push(new DrawableSphere({
-                    center: Vector3.createRandom(10000, -10000),
-                    radius: Helpers.rand(2500, 3500),
-                    // color: Vector3.createRandom(20, 5),
-                    color: new Vector3(1.0, 1.0, 1.0).multiplyN(20),
-                    textureIndex: ut.getTextureIndex('sun'),
-                }));
+                const object = state.OBJECTS.stars[state.lights.length % state.OBJECTS.stars.length]
+                    .clone();
+                // object.geometry.center.set(Vector3.createRandom(10000, -10000));
+                state.lights.push(object);
             }
         } else {
             state.lights.length = Math.max(0, state.lightsCount || 0);
+        }
+
+        if (state.objectsCount > state.objects.length) {
+            const count = state.objectsCount - state.objects.length;
+            for (let i=0; i<count; ++i) {
+                const object = state.OBJECTS.planets[state.objects.length % state.OBJECTS.planets.length]
+                    .clone();
+
+                if (state.objects.length === 0) {
+                    object.geometry.center.setN(0, 0, 0);
+                } else {
+                    const po = state.objects[state.objects.length-1];
+                    object.geometry.center.setN(
+                        po.geometry.center.x + po.geometry.radius + object.geometry.radius + 7e7,
+                        0,
+                        -(po.geometry.center.z + po.geometry.radius + object.geometry.radius + 7e8),
+                    );
+                }
+
+                if (state.objects.length === 3) {
+                    ENGINE.makeSattellite({
+                        centerBody: state.objects[state.objects.length-1],
+                        satelliteBody: object,
+                        distance: 1e6,
+                    });
+                } else if (state.lights.length) {
+                    ENGINE.makeSattellite({
+                        centerBody: state.lights[0],
+                        satelliteBody: object,
+                        // distance: 1e6,
+                    });
+                }
+                // object.geometry.center.set(Vector3.createRandom(
+                //         1 * object.geometry.radius,
+                //         -1 * object.geometry.radius
+                // ));
+                state.objects.push(object);
+            }
+        } else {
+            state.objects.length = Math.max(0, state.objectsCount || 0);
         }
     }
 
@@ -230,18 +265,7 @@
         // state.infoText = dt.toString();
 
         const { acceleration } = checkKeys();
-
-        state.camera.origin.plus(acceleration.multiplyN(/* dt * dt */ 0.016 * 0.016));
-
-        const angleXZ = state.time * (2 * Math.PI) / state.lightLoopPeriod;
-        const lightXZ = Vector2.fromAngle(
-            angleXZ - Math.PI / 2,
-            state.lightLoopRadius,
-        );
-
-        state.lights[0]?.angles.setN(undefined, angleXZ);
-        state.lights[1]?.center.setN(lightXZ.x, 0, lightXZ.y);
-        state.lights[1]?.angles.setN(undefined, -angleXZ);
+        CAMERA_OBJ.body.acceleration.set(acceleration.multiplyN(1 / state.timeMultiplier ** 2));
 
         const MO = 12;
         const BO = MO + 8;
@@ -257,17 +281,25 @@
         state.resolution.putToArray(f32a, MO + 0);
 
         f32a[MO + 2] = state.camera.d;
-        f32a[MO + 3] = state.camera.viewDistance;
+        f32a[MO + 3] = state.camera.distance;
         i32a[MO + 4] = state.lights.length;
         i32a[MO + 5] = state.lights.length + state.objects.length;
 
         const bodies = [...state.lights, ...state.objects];
 
+        ENGINE.clearBodies();
+        ENGINE.addBodies(bodies);
+        ENGINE.addBody(CAMERA_OBJ.body);
+
+        ENGINE.calcStep(dt);
+
         for (let i=0; i<bodies.length; ++i) {
             const offset = BO + SS * i;
-            bodies[i].putToArray(f32a, offset, state.camera.origin);
-            i32a[offset + 7] = bodies[i].textureIndex;
-            f32a[offset + 10] = bodies[i].radius * 2.3;
+            const ds: DrawableSphere<TEXTURES.TextureName> = <any> bodies[i].geometry;
+
+            ds.putToArray(f32a, offset, state.camera.origin);
+            i32a[offset + 7] = ut.getTextureIndex(ds.textureName);
+            f32a[offset + 10] = ds.radius * 1.3;
         }
         
         ut.updateUniformBuffer(state.uniforms.buffer, f32a.buffer);
@@ -379,7 +411,7 @@
     bind:pause={state.isPause}
     bind:resolution={state.resolution.z}
     bind:fov={state.camera.d}
-    bind:viewDistance={state.camera.viewDistance}
+    bind:viewDistance={state.camera.distance}
     bind:acceleration={state.acceleration}
     bind:accelerationBoost={state.accelerationBoost}
     bind:timeMultiplier={state.timeMultiplier}

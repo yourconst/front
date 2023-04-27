@@ -142,12 +142,55 @@ vec3 getSkyBoxHitColor(vec3 rayDirection) {
     }
 }
 
-vec3 getHitReflectColor(vec3 hitPoint, float hitDistance, vec3 hitColor, int hitIndex, vec3 hitNormal, bool faceToLight) {
+vec3 getAtmosphereReflectColor(Ray camera, Ray hit, float hitDistance, vec3 hitColor) {
+    vec3 reflectColor = vec3(0.0, 0.0, 0.0);
+
+    for (int j=0; j<info.lightsCount; ++j) {
+        Ray lightRay = Ray(hit.origin, normalize(info.spheres[j].center - hit.origin));
+        float lightCos = dot(lightRay.direction, hit.direction);
+
+        if (lightCos < 0.0) {
+            continue;
+        }
+
+        float lightDistance = Sphere_getRayDistance(
+            info.spheres[j].center,
+            info.spheres[j].radius,
+            lightRay
+        );
+
+        bool inDark = false;
+
+        for (int i=info.lightsCount; i<info.count; ++i) {
+            float _distance = Sphere_getRayDistance(
+                info.spheres[i].center,
+                info.spheres[i].radius,
+                lightRay
+            );
+    
+            if (_distance < lightDistance) {
+                inDark = true;
+                break;
+            }
+        }
+
+        if (!inDark) {
+            float lightDistanceFactor = min(1.0, pow(lightDistance / info.spheres[j].radius, -2.0));
+            // TODO
+            float viewDistanceFactor = min(1.0, pow(hitDistance / info.spheres[j].radius, -1.0));
+            reflectColor += hitColor * info.spheres[j].color * lightCos * (lightDistanceFactor * viewDistanceFactor);
+        }
+    }
+
+    return reflectColor;
+}
+
+vec3 getHitReflectColor(vec3 hitPoint, float hitDistance, vec3 hitColor, int hitIndex, vec3 hitNormal) {
     vec3 reflectColor = vec3(0.0, 0.0, 0.0);
 
     for (int j=0; j<info.lightsCount; ++j) {
         Ray lightRay = Ray(hitPoint, normalize(info.spheres[j].center - hitPoint));
-        float lightCos = faceToLight ? 1.0 : dot(lightRay.direction, hitNormal);
+        float lightCos = dot(lightRay.direction, hitNormal);
 
         if (lightCos < 0.0) {
             continue;
@@ -256,10 +299,10 @@ vec3 getHitColorWithAtmosphere(Ray ray) {
 
         if (hitIndex < info.lightsCount) {
             result += hitColor * multiplier * distanceFactor;
-            continue;
+            // continue;
         }
 
-        vec3 reflectColor = getHitReflectColor(hitPoint, distance, hitColor, hitIndex, hitNormal, false);
+        vec3 reflectColor = getHitReflectColor(hitPoint, distance, hitColor, -1, hitNormal);
 
         result += reflectColor * multiplier;
     }
@@ -287,15 +330,11 @@ vec3 getHitColorWithAtmosphere(Ray ray) {
         info.spheres[hitIndex].color
     ).xyz;
 
-    // Fake depth texture
-    // hitNormal = normalize(hitNormal + hitColor * 0.5);
-    // hitColor = info.spheres[hitIndex].color;
-
     if (hitIndex < info.lightsCount) {
         return result + hitColor/*  * info.spheres[hitIndex].color */ * cos * (0.05 + distanceFactor);
     }
 
-    vec3 reflectColor = getHitReflectColor(hitPoint, distance, hitColor, hitIndex, hitNormal, false);
+    vec3 reflectColor = getHitReflectColor(hitPoint, distance, hitColor, hitIndex, hitNormal);
 
     return result + (hitColor * 0.01 * distanceFactor + reflectColor) * cos;
 }
@@ -344,10 +383,10 @@ vec3 getHitColor(Ray ray) {
     // hitColor = info.spheres[hitIndex].color;
 
     if (hitIndex < info.lightsCount) {
-        return hitColor/*  * info.spheres[hitIndex].color */ * cos * (0.05 + distanceFactor);
+        return hitColor * info.spheres[hitIndex].color * cos * (0.05 + distanceFactor);
     }
 
-    vec3 reflectColor = getHitReflectColor(hitPoint, distance, hitColor, hitIndex, hitNormal, false);
+    vec3 reflectColor = getHitReflectColor(hitPoint, distance, hitColor, hitIndex, hitNormal);
 
     return (hitColor * 0.01 * distanceFactor + reflectColor) * cos;
 }
@@ -360,8 +399,8 @@ void main() {
 
     Ray ray = Ray(vec3(0.0, 0.0, 0.0), normalize(dir3));
 
-    // vec3 rawColor = getHitColor(ray);
-    vec3 rawColor = getHitColorWithAtmosphere(ray);
+    vec3 rawColor = getHitColor(ray);
+    // vec3 rawColor = getHitColorWithAtmosphere(ray);
 
     rawColor = pow(rawColor, vec3(1.0/2.2, 1.0/2.2, 1.0/2.2));
 

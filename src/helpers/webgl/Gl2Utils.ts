@@ -254,7 +254,7 @@ export class Gl2Utils<TextureName extends string = null> {
         maxHeight?: number;
     }) {
         // TODO: remove
-        return;
+        // return;
         const entries: [TextureName, string][] = <any> Object.entries(dict);
         
         if (entries.length + this.getTexturesCount() > 32) {
@@ -284,7 +284,7 @@ export class Gl2Utils<TextureName extends string = null> {
 
     getTextureIndex(name: TextureName) {
         // TODO: remove
-        return -1;
+        // return -1;
         const config = this.texturesMap.get(name);
 
         if (!config) {
@@ -299,7 +299,7 @@ export class Gl2Utils<TextureName extends string = null> {
 
     reserveTextureIndex(name: TextureName, index: number) {
         // TODO: remove
-        return -1;
+        // return -1;
         const existingConfig = this.texturesMap.get(name);
 
         if (existingConfig && existingConfig.index !== index) {
