@@ -1,4 +1,5 @@
 import { Helpers } from "../../helpers/common";
+import { Vector3 } from "./Vector3";
 
 export class Vector4 {
     static createRandom(max = 1, min = 0) {
@@ -19,10 +20,23 @@ export class Vector4 {
         );
     }
 
+    static createFromPixelUI8(r = 0, g = 0, b = 0, opacity = 255) {
+        return new Vector4(
+            r / 255,
+            g / 255,
+            b / 255,
+            opacity / 255,
+        );
+    }
+
     constructor(public x = 0, public y = 0, public z = 0, public w = 0) { }
 
     clone() {
         return new Vector4(this.x, this.y, this.z, this.w);
+    }
+
+    getXYZ() {
+        return new Vector3(this.x, this.y, this.z);
     }
 
     isEquals(v: Vector4) {
@@ -31,15 +45,6 @@ export class Vector4 {
 
     isEqualsN(x = this.x, y = this.y, z = this.z, w = this.w) {
         return (this.x === x) && (this.y === y) && (this.z === z) && (this.w === w);
-    }
-
-    putToArray(array: ArrayBufferView | Array<number>, offset = 0, relativeTo?: Vector4) {
-        array[offset + 0] = this.x - (relativeTo?.x || 0);
-        array[offset + 1] = this.y - (relativeTo?.y || 0);
-        array[offset + 2] = this.z - (relativeTo?.z || 0);
-        array[offset + 3] = this.w - (relativeTo?.w || 0);
-
-        return offset + 4;
     }
 
     getNormBytes(max = 1.0) {

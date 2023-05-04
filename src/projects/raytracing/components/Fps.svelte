@@ -3,7 +3,7 @@
     export let bufferSize = 10;
     export let isPause = false;
     $: prevIsPause = !isPause;
-    let value: string;
+    let value: string = 'fps';
 
     const buffer = new Array<number>();
     let lastFrameTime = Date.now();
@@ -40,7 +40,14 @@
         font-size: 16px;
         font-family: 'Courier New', Courier, monospace;
         position: fixed;
-        right: 10px;
-        top: 10px;
+        right: 0px;
+        bottom: 0px;
+
+        padding: 10px;
+
+        background: rgba(55, 55, 55, 0.7);
+
+        border-top-left-radius: 5px;
+        border-bottom-left-radius: 5px;
     }
 </style>

@@ -102,6 +102,13 @@ class SleeperChanging {
 
         this._handleUpdaterPromise();
     }
+
+    extend() {
+        this._startTime = Date.now();
+        this._handleUpdaterPromise();
+
+        return this;
+    }
     
     sleep() {
         if (this._promise) {
@@ -120,6 +127,79 @@ class SleeperChanging {
         this._promise?.resolve();
         this._promise = null;
     }
+
+    getPromise() {
+        return this._promise?.promise;
+    }
+}
+
+interface NumberUnitFormatterUnit {
+    name: string;
+    value: number;
+    countToNext?: number;
+    decimals?: number;
+}
+
+export class NumberUnitFormatter {
+    readonly units: NumberUnitFormatterUnit[];
+
+    constructor(units: NumberUnitFormatterUnit[], options?: {
+        countToNext?: number;
+        baseToFormat?: number;
+        decimals?: number;
+
+    }) {
+        if (!units.length) {
+            throw new Error('Units is empty');
+        }
+
+        this.units = units.slice().sort((e1, e2) => e1.value - e2.value);
+
+        for (const unit of this.units) {
+            unit.countToNext ??= options?.countToNext ?? 1000;
+            unit.decimals ??= options?.decimals;
+        }
+    }
+
+    getInfo(value: number) {
+        let rv = value;
+        let ru: NumberUnitFormatterUnit;
+
+        for (const unit of this.units) {
+            rv = value / unit.value;
+
+            if (Math.abs(rv) < unit.countToNext) {
+                ru = unit;
+                break;
+            }
+        }
+
+        if (!ru) {
+            ru = this.units.at(-1);
+        }
+
+        return {
+            value: rv,
+            unit: ru,
+        };
+    }
+
+    format(value: number) {
+        if (!isFinite(value)) {
+            return `${value}`;
+        }
+
+        const info = this.getInfo(value);
+        let strValue: string;
+
+        if (typeof info.unit?.decimals === 'number') {
+            strValue = info.value.toFixed(info.unit.decimals);
+        } else {
+            strValue = `${info.value}`;
+        }
+
+        return `${strValue}${info.unit.name}`;
+    }
 }
 
 export class Helpers {
@@ -128,6 +208,7 @@ export class Helpers {
     static readonly PromiseManaged = PromiseManaged;
     static readonly PromiseManagedTimeouted = PromiseManagedTimeouted;
     static readonly SleeperChanging = SleeperChanging;
+    static readonly NumberUnitFormatter = NumberUnitFormatter;
 
     static rand(max: number, min = 0) {
         return min + Math.random() * (max - min);
@@ -141,6 +222,10 @@ export class Helpers {
         return (n & (n - 1)) === 0;
     }
 
+    static capitalizeFirstLetter(s: string) {
+        return s.slice(0, 1).toUpperCase().concat(s.slice(1));
+    }
+
     static createOffscreenCanvas(width: number, height: number) {
         if (window['OffscreenCanvas']) {
             return new OffscreenCanvas(width, height);
@@ -151,5 +236,47 @@ export class Helpers {
         canvas.height = height;
 
         return canvas;
+    }
+
+    static fract(n: number) {
+        return n % 1;
+    }
+
+    static pnrandf(seed: number) {
+        return (
+            43758.5453 + (
+                (seed % 123.456789) * 43758.5453
+            ) % 1
+        ) % 1;
+
+        // return (
+        //     (
+        //         seed + 43758.5453 + seed * 43758.5453
+        //     ) % 123.456789
+        // ) % 1;
+    }
+
+    static pnrandi30(seed: number) {
+        return (Helpers.pnrandf(seed) * (1 << 30)) >> 0;
+    }
+
+    static psrandf(s: string, seed = s.length) {
+        for (let i = 0; i < s.length; ++i) {
+            seed = Helpers.pnrandf(s.charCodeAt(i) + i * seed);
+        }
+
+        return seed;
+    }
+
+    static psrandi30(s: string, seed = s.length) {
+        for (let i = 0; i < s.length; ++i) {
+            seed = Helpers.pnrandi30(s.charCodeAt(i) + i * seed);
+        }
+
+        return seed;
+    }
+
+    static getbiti32(n: number, bitNumber: number) {
+        return !!(n & (1 << bitNumber));
     }
 }

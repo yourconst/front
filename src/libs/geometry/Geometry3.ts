@@ -1,5 +1,6 @@
 import type { AABB3 } from "../math/AABB3";
 import { Vector3 } from "../math/Vector3";
+import { Ray3 } from "../math/Ray3";
 
 // export interface Geometry3Options {
 //     center: Vector3;
@@ -24,6 +25,8 @@ export abstract class Geometry3 {
     ) { }
 
     abstract clone(): Geometry3;
+
+    abstract getRayDistance(ray: Ray3): number;
     
     calcRadius() {
         return this.radius;
@@ -33,6 +36,24 @@ export abstract class Geometry3 {
 
     getRadiusVectorByCentresTo(geometry: Geometry3) {
         return geometry.center.clone().minus(this.center);
+    }
+
+    getClosestPointToPoint(p: Vector3) {
+        const to = p.clone().minus(this.center);
+        const tol = to.length();
+
+        if (tol < this.getRadius()) {
+            return p.clone();
+        }
+
+        return to.multiplyN(this.getRadius() / tol).plus(this.center);
+    }
+
+    getClosestSurfacePointToPoint(p: Vector3) {
+        const to = p.clone().minus(this.center).setXIfNull();
+        let tol = to.length();
+
+        return to.multiplyN(this.getRadius() / tol).plus(this.center);
     }
 
     getNormalToPoint(p: Vector3) {
@@ -63,16 +84,32 @@ export abstract class Geometry3 {
     }
 
     getCollision(geometry: Geometry3): Collision {
-        const info = this.getCollisionPointInfo(geometry);
+        const op = geometry.getClosestSurfacePointToPoint(this.center);
+        const tp = this.getClosestSurfacePointToPoint(op);
 
-        if (!info.isCollided) {
-            return info;
+        if (this.center.distance2To(tp) < this.center.distance2To(op)) {
+            return {
+                isCollided: false,
+            };
         }
 
         return {
-            ...info,
-            normal: this.getNormalToPoint(info.point),
+            isCollided: true,
+            depth: op.distanceTo(tp),
+            point: op.clone().plus(tp).multiplyN(0.5),
+            normal: op.clone().minus(tp).normalize(),
         };
+
+        // const info = this.getCollisionPointInfo(geometry);
+
+        // if (!info.isCollided) {
+        //     return info;
+        // }
+
+        // return {
+        //     ...info,
+        //     normal: this.getNormalToPoint(info.point),
+        // };
     }
 
     getRadius() {
@@ -109,5 +146,46 @@ export abstract class Geometry3 {
     recalcVolume() {
         this.volume = this.calcVolume();
         return this.volume;
+    }
+
+
+
+
+    getReverseAngles() {
+        return this.angles.clone().multiplyN(-1);
+    }
+
+    getRelativeDirection(ad: Vector3) {
+        return ad.clone().rotateReverseZYX(this.angles);
+    }
+
+    getRelativePoint(ap: Vector3) {
+        return ap.clone()
+            .minus(this.center)
+            .rotateReverseZYX(this.angles);
+    }
+
+    getAbsoluteDirection(rd: Vector3) {
+        return rd.clone().rotateXYZ(this.angles);
+    }
+
+    getAbsolutePoint(rp: Vector3) {
+        return rp.clone()
+            .rotateXYZ(this.angles)
+            .plus(this.center);
+    }
+
+    getRelativeRay(ar: Ray3) {
+        return new Ray3(
+            this.getRelativePoint(ar.origin),
+            this.getRelativeDirection(ar.direction),
+        )
+    }
+
+    getAbsoluteRay(rr: Ray3) {
+        return new Ray3(
+            this.getAbsolutePoint(rr.origin),
+            this.getAbsoluteDirection(rr.direction),
+        )
     }
 }

@@ -12,10 +12,41 @@
     export let acceleration: number;
     export let accelerationBoost: number;
     export let timeMultiplier: number;
-    export let lightOrbitPeriod: number;
-    export let lightOrbitRadius: number;
-    export let lightsCount: number;
-    export let objectsCount: number;
+
+    export let stars: Record<string, boolean>;
+    export let planets: Record<string, boolean>;
+    export let lockViewOn: string = null;
+    export let showDistanceTo: string = null;
+
+    export let beSatelliteOf: (options: {
+        centerName: string;
+        distance: number;
+        k: number;
+    }) => void;
+
+    const beSatelliteOfOptions = {
+        centerName: null,
+        distance: 1,
+        k: 1.0,
+    };
+
+    $: selectedBodies = [
+        ...Object.entries(stars).filter(([k,v]) => v).map(([k]) => k),
+        ...Object.entries(planets).filter(([k,v]) => v).map(([k]) => k),
+    ];
+
+    function onMultipleSelect(
+        e: Event & { currentTarget: EventTarget & HTMLSelectElement; },
+        dictionary: Record<string, boolean>,
+    ) {
+        const t = e.currentTarget;
+
+        for (const option of t.options) {
+            dictionary[option.value] = option.selected;
+        }
+
+        return dictionary;
+    }
 </script>
 
 <div id="menu" style={'right: ' + (show ? '0px' : '-380px')}>
@@ -30,7 +61,7 @@
         </tr>
         <tr>
             <td>FOV</td>
-            <td><CustomLawRange bind:value={fov} min={0.05} max={30} step='any' law={customLaws.createPow(2)} /></td>
+            <td><CustomLawRange bind:value={fov} min={0.4} max={30} step='any' law={customLaws.createPow(2)} /></td>
         </tr>
         <tr>
             <td>View Distance</td>
@@ -49,21 +80,57 @@
             <td><CustomLawRange bind:value={timeMultiplier} min={0} max={1000} step='any' law={customLaws.createPow(3)} /></td>
         </tr>
         <tr>
-            <td>Light orbit period</td>
-            <td><CustomLawRange bind:value={lightOrbitPeriod} min={0} max={100} step='any' law={customLaws.createPow(2)} /></td>
+            <td>Stars</td>
+            <td><select multiple={true} on:input={e => stars = onMultipleSelect(e, stars)}>
+                {#each Object.keys(stars) as planet}
+                    <option selected={stars[planet]} value={planet}>{planet}</option>
+                {/each}
+            </select></td>
         </tr>
         <tr>
-            <td>Light orbit radius</td>
-            <td><CustomLawRange bind:value={lightOrbitRadius} min={1e4} max={1e6} step='any' law={customLaws.createPow(2)} /></td>
+            <td>Planets</td>
+            <td><select multiple={true} on:input={e => planets = onMultipleSelect(e, planets)}>
+                {#each Object.keys(planets) as planet}
+                    <option selected={planets[planet]} value={planet}>{planet}</option>
+                {/each}
+            </select></td>
         </tr>
         <tr>
-            <td>Lights</td>
-            <td><CustomLawRange bind:value={lightsCount} min={0} max={10} step={1} law={customLaws.linear} /></td>
+            <td>Lock view on</td>
+            <td><select bind:value={lockViewOn}>
+                {#each [null, ...selectedBodies] as body}
+                    <option value={body}>{body}</option>
+                {/each}
+            </select></td>
         </tr>
         <tr>
-            <td>Objects</td>
-            <td><CustomLawRange bind:value={objectsCount} min={0} max={100} step={1} law={customLaws.linear} /></td>
+            <td>Show distance to</td>
+            <td><select bind:value={showDistanceTo}>
+                {#each [null, ...selectedBodies] as body}
+                    <option value={body}>{body}</option>
+                {/each}
+            </select></td>
         </tr>
+        <tr>
+            <td>
+                <input type='button' value='Be satellite' disabled={!beSatelliteOfOptions.centerName}
+                    on:click={() => beSatelliteOf(beSatelliteOfOptions)}
+                />
+            </td>
+            <td>
+                <select bind:value={beSatelliteOfOptions.centerName}>
+                    {#each selectedBodies as body}
+                        <option value={body}>{body}</option>
+                    {/each}
+                </select>
+            </td>
+        </tr>
+        <tr><td>Orbit distance</td><td>
+            <CustomLawRange bind:value={beSatelliteOfOptions.distance} min={1} max={1e11} step='any' law={customLaws.createPow(1.5)} />
+        </td></tr>
+        <tr><td>K</td><td>
+            <CustomLawRange bind:value={beSatelliteOfOptions.k} min={0} max={3} step='any' law={customLaws.linear} />
+        </td></tr>
     </table>
 </div>
 

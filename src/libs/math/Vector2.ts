@@ -26,11 +26,11 @@ export class Vector2 {
         return this.x === x && this.y === y;
     }
 
-    putToArray(array: ArrayBufferView | Array<number>, offset = 0) {
-        array[offset + 0] = this.x;
-        array[offset + 1] = this.y;
-
-        return offset + 2;
+    getSinCos() {
+        return {
+            x: Vector2.fromAngle(this.x),
+            y: Vector2.fromAngle(this.y),
+        };
     }
 
     set(v: Vector2) {
@@ -45,9 +45,38 @@ export class Vector2 {
         return this;
     }
 
+    trunc() {
+        this.x = Math.trunc(this.x);
+        this.y = Math.trunc(this.y);
+
+        return this;
+    }
+
+    ceil() {
+        this.x = Math.ceil(this.x);
+        this.y = Math.ceil(this.y);
+
+        return this;
+    }
+
+    min() {
+        return Math.min(this.x, this.y);
+    }
+
+    max() {
+        return Math.max(this.x, this.y);
+    }
+
     plus(v: Vector2) {
         this.x += v.x;
         this.y += v.y;
+        return this;
+    }
+
+    multiply(v: Vector2) {
+        this.x *= v.x;
+        this.y *= v.y;
+
         return this;
     }
 
@@ -58,7 +87,21 @@ export class Vector2 {
         return this;
     }
 
-    rotateByAngle(a = 0) {
+    divide(v: Vector2) {
+        this.x /= v.x;
+        this.y /= v.y;
+
+        return this;
+    }
+
+    divideN(n: number) {
+        this.x /= n;
+        this.y /= n;
+
+        return this;
+    }
+
+    rotate(a = 0) {
         const { x, y } = this;
         const cos = Math.cos(a), sin = Math.sin(a);
 

@@ -1,4 +1,6 @@
 import { Helpers } from "../../helpers/common";
+import { Ray3 } from "./Ray3";
+import { Vector2 } from "./Vector2";
 
 export class Vector3 {
     static createRandom(max = 1, min = 0) {
@@ -9,18 +11,17 @@ export class Vector3 {
         );
     }
 
-    static createColor(r = 0, g = 0, b = 0) {
-        return new Vector3(
-            Math.pow(r, 1 / 2.2),
-            Math.pow(g, 1 / 2.2),
-            Math.pow(b, 1 / 2.2),
-        );
-    }
-
     constructor(public x = 0, public y = 0, public z = 0) { }
 
     clone() {
         return new Vector3(this.x, this.y, this.z);
+    }
+    
+    setXIfNull(x = 1) {
+        if (this.x === 0 && this.y === 0 && this.z === 0) {
+            this.x = x;
+        }
+        return this;
     }
 
     isEquals(v: Vector3) {
@@ -31,12 +32,12 @@ export class Vector3 {
         return (this.x === x) && (this.y === y) && (this.z === z);
     }
 
-    putToArray(array: ArrayBufferView | Array<number>, offset = 0, relativeTo?: Vector3) {
-        array[offset + 0] = this.x - (relativeTo?.x || 0);
-        array[offset + 1] = this.y - (relativeTo?.y || 0);
-        array[offset + 2] = this.z - (relativeTo?.z || 0);
-
-        return offset + 3;
+    getSinCos() {
+        return {
+            x: Vector2.fromAngle(this.x),
+            y: Vector2.fromAngle(this.y),
+            z: Vector2.fromAngle(this.z),
+        };
     }
 
     maxSet(v: Vector3) {
@@ -95,6 +96,54 @@ export class Vector3 {
         return this;
     }
 
+    trunc() {
+        this.x = Math.trunc(this.x);
+        this.y = Math.trunc(this.y);
+        this.z = Math.trunc(this.z);
+
+        return this;
+    }
+
+    ceil() {
+        this.x = Math.ceil(this.x);
+        this.y = Math.ceil(this.y);
+        this.z = Math.ceil(this.z);
+
+        return this;
+    }
+
+    round() {
+        this.x = Math.round(this.x);
+        this.y = Math.round(this.y);
+        this.z = Math.round(this.z);
+
+        return this;
+    }
+
+    fround() {
+        this.x = Math.fround(this.x);
+        this.y = Math.fround(this.y);
+        this.z = Math.fround(this.z);
+
+        return this;
+    }
+
+    abs() {
+        this.x = Math.abs(this.x);
+        this.y = Math.abs(this.y);
+        this.z = Math.abs(this.z);
+
+        return this;
+    }
+
+    sign() {
+        this.x = Math.sign(this.x);
+        this.y = Math.sign(this.y);
+        this.z = Math.sign(this.z);
+
+        return this;
+    }
+
     length2() {
         return this.x * this.x + this.y * this.y + this.z * this.z;
     }
@@ -111,10 +160,47 @@ export class Vector3 {
         return this.clone().minus(v).length();
     }
 
+    multiply(v: Vector3) {
+        this.x *= v.x;
+        this.y *= v.y;
+        this.z *= v.z;
+
+        return this;
+    }
+
     multiplyN(n: number) {
         this.x *= n;
         this.y *= n;
         this.z *= n;
+
+        return this;
+    }
+
+    multiplyX(n: number) {
+        this.x *= n;
+        return this;
+    }
+    multiplyY(n: number) {
+        this.y *= n;
+        return this;
+    }
+    multiplyZ(n: number) {
+        this.z *= n;
+        return this;
+    }
+
+    divide(v: Vector3) {
+        this.x /= v.x;
+        this.y /= v.y;
+        this.z /= v.z;
+
+        return this;
+    }
+
+    divideN(n: number) {
+        this.x /= n;
+        this.y /= n;
+        this.z /= n;
 
         return this;
     }
@@ -155,21 +241,92 @@ export class Vector3 {
         return this;
     }
 
-    rotateByAngles(xz: number, yz: number) {
-        let { x, y, z } = this;
-        const cosxz = Math.cos(xz), sinxz = Math.sin(xz);
+    sphereNormalGetUV() {
+        return new Vector2(
+            0.5 + Math.atan2(this.z, this.x) / (2 * Math.PI),
+            Math.atan2(Math.sqrt(this.x*this.x + this.z*this.z), this.y) / Math.PI,
+        );
+    }
 
-        this.x = x * cosxz - z * sinxz;
-        this.z = x * sinxz + z * cosxz;
+    rotateX(ax: number) {
+        const cosx = Math.cos(ax), sinx = Math.sin(ax);
+        const { y, z } = this;
 
-        z = this.z;
-
-        const cosyz = Math.cos(yz), sinyz = Math.sin(yz);
-
-        this.y = y * cosyz - z * sinyz;
-        this.z = y * sinyz + z * cosyz;
+        this.y = y * cosx - z * sinx;
+        this.z = y * sinx + z * cosx;
 
         return this;
+    }
+
+    rotateY(ay: number) {
+        const cosy = Math.cos(ay), siny = Math.sin(ay);
+        const { x, z } = this;
+
+        this.x = x * cosy - z * siny;
+        this.z = x * siny + z * cosy;
+
+        return this;
+    }
+
+    rotateZ(az: number) {
+        const cosz = Math.cos(az), sinz = Math.sin(az);
+        const { x, y } = this;
+
+        this.x = x * cosz - y * sinz;
+        this.y = x * sinz + y * cosz;
+
+        return this;
+    }
+
+    rotateXYZ(as: Vector3) {
+        return this.rotateX(as.x).rotateY(as.y).rotateZ(as.z);
+    }
+
+    rotateZYX(as: Vector3) {
+        return this.rotateZ(as.z).rotateY(as.y).rotateX(as.x);
+    }
+
+    rotateReverseZYX(as: Vector3) {
+        return this.rotateZ(-as.z).rotateY(-as.y).rotateX(-as.x);
+    }
+
+    rotateZXY(as: Vector3) {
+        return this.rotateZ(as.z).rotateX(as.x).rotateY(as.y);
+    }
+
+    rotateYXZ(as: Vector3) {
+        return this.rotateZ(as.y).rotateX(as.x).rotateY(as.z);
+    }
+
+    rotate(as: Vector3, order: ('X' | 'Y' | 'Z')[]) {
+        for (const a of order) {
+            // this[`rotate${a}`](as[a.toLowerCase()]);
+            if (a === 'X') this.rotateX(as.x); else
+            if (a === 'Y') this.rotateY(as.y); else
+            if (a === 'Z') this.rotateZ(as.z);
+        }
+
+        return this;
+    }
+
+    angles() {
+        return new Vector2(
+            Math.atan2(this.z, this.x),
+            Math.atan2(Math.sqrt(this.x * this.x + this.z * this.z), this.y),
+        );
+    }
+
+    angleBetween(v: Vector3) {
+        return Math.acos(this.clone().normalize().dot(v.clone().normalize()));
+    }
+
+    sinAbsBetween(v: Vector3) {
+        const cos = this.cosBetween(v);
+        return Math.sqrt(1 - cos * cos);
+    }
+
+    cosBetween(v: Vector3) {
+        return this.clone().normalize().dot(v.clone().normalize());
     }
 
     dot(v: Vector3) {
@@ -183,4 +340,10 @@ export class Vector3 {
             this.x * v.y - this.y * v.x,
         );
     }
+
+    getRayToPoint(p: Vector3) {
+        return new Ray3(this, p.clone().minus(this).normalize());
+    }
 }
+
+globalThis['Vector3'] = Vector3;

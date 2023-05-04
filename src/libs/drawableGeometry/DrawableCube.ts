@@ -1,16 +1,16 @@
-import { Sphere, type SphereOptions } from "../geometry/Sphere";
+import { Cube, type CubeOptions } from "../geometry/Cube";
 import type { Vector3 } from "../math/Vector3";
 import type { IDrawableGeometry, IDrawableGeometryOptions } from "./DrawableGeometry";
 
-export interface DrawableSphereOptions extends SphereOptions, IDrawableGeometryOptions {
+export interface DrawableCubeOptions extends CubeOptions, IDrawableGeometryOptions {
     
 }
 
-export class DrawableSphere extends Sphere implements IDrawableGeometry {
+export class DrawableCube extends Cube implements IDrawableGeometry {
     public color: IDrawableGeometry['color'];
     public texture?: IDrawableGeometry['texture'];
 
-    constructor(options: DrawableSphereOptions) {
+    constructor(options: DrawableCubeOptions) {
         super(options);
         
         this.color = options.color;
@@ -21,11 +21,11 @@ export class DrawableSphere extends Sphere implements IDrawableGeometry {
         return {
             ...super._getCloneConfig(),
             color: this.color.clone(),
-            texture: this.texture,
+            textureName: this.texture,
         };
     }
 
     clone() {
-        return new DrawableSphere(this._getCloneConfig());
+        return new DrawableCube(this._getCloneConfig());
     }
 }

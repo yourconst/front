@@ -6,35 +6,55 @@
     import { Vector2 } from "../../libs/math/Vector2";
     import { Vector3 } from "../../libs/math/Vector3";
     import * as SHADERS from "./shaders";
-    import * as TEXTURES from "./textures";
+    import type * as TEXTURES from "./textures";
     import { Matrix } from "../../libs/math/Matrix";
+    import { Matrix3x3 } from "../../libs/math/Matrix3x3";
     import { Helpers } from "../../helpers/common";
     import Menu from "./components/Menu.svelte";
     import Fps from "./components/Fps.svelte";
-    import type { DrawableSphere } from "../../libs/drawableGeometry/DrawableSphere";
-    import Info from "./components/Info.svelte";
+    import { DrawableSphere } from "../../libs/drawableGeometry/DrawableSphere";
     import { Camera3 } from "../../libs/render/Camera3";
     import { OBJECTS } from "./configs/objects";
-    import type { RigidBody3 } from "../../libs/physics/RigidBody3";
+    import { RigidBody3 } from "../../libs/physics/RigidBody3";
     import { PhysicsEngine3 } from "../../libs/physics/PhysicsEngine3";
+    import { CONSTANTS } from "./configs/constants";
+    import { Info } from "./components/Info";
+    import { Block, Planet } from "./physics/Planet";
+    import { Body3 } from "../../libs/physics/Body3";
+    import { Texture } from "../../libs/render/Texture";
+    import { Renderer } from "./shaders/Renderer";
+    import type { IDrawableGeometry } from "../../libs/drawableGeometry/DrawableGeometry";
+//   import HoveredElement from "./components/HoveredElement.svelte";
+
+    const NUF = new Helpers.NumberUnitFormatter([
+        { name: 'm', value: CONSTANTS.DISTANCE.M, countToNext: CONSTANTS.DISTANCE.KM / CONSTANTS.DISTANCE.M },
+        { name: 'km', value: CONSTANTS.DISTANCE.KM, countToNext: CONSTANTS.DISTANCE.AU / CONSTANTS.DISTANCE.KM },
+        { name: 'au', value: CONSTANTS.DISTANCE.AU, countToNext: CONSTANTS.DISTANCE.LY / CONSTANTS.DISTANCE.AU },
+        { name: 'ly', value: CONSTANTS.DISTANCE.LY },
+    ], {
+        decimals: 2,
+    });
+
+    const ENGINE = new PhysicsEngine3<'stars' | 'planets' | 'blocks', TEXTURES.TextureName>();
 
     const CAMERA_OBJ = Camera3.createWithBody({
         origin: new Vector3(0, 0, -10000),
         angles: new Vector3(),
-        d: 1,
+        d: 0.5,
         distance: 1e15,
     });
 
-    const ENGINE = new PhysicsEngine3();
+    ENGINE.addBody(CAMERA_OBJ.body);
 
     let onFrame: () => number;
     let canvas: HTMLCanvasElement;
     let ut: Gl2Utils<TEXTURES.TextureName>;
     const state = {
         isDestroyed: false,
-        isPause: false,
+        isPause: true,
         isMenu: false,
-        infoText: '',
+        info: new Info(),
+        // hoveredElement: <HTMLElement> null,
         program: <WebGLProgram> null,
         attributes: {
             positions: <number> null,
@@ -50,25 +70,50 @@
         ENGINE,
         objects: <RigidBody3[]>[],
         lights: <RigidBody3[]>[],
-        objectsCount: 9,
-        lightsCount: 1,
-        acceleration: Infinity, // 1e6,
+        acceleration: 1, // Infinity, // 1e6,
         accelerationBoost: 10,
-        lightLoopPeriod: 5,
-        lightLoopRadius: 25000,
         time: 0,
         timeMultiplier: 1,
+        selectedStars:
+            <Record<TEXTURES.TextureName, boolean>>
+            Object.fromEntries(Object.keys(OBJECTS.stars).map(n => [n, true])),
+        selectedPlanets:
+            <Record<TEXTURES.TextureName, boolean>>
+            Object.fromEntries(Object.keys(OBJECTS.planets).map(n => [n, true])),
+        lockViewOn: <TEXTURES.TextureName> null,
+        showDistanceTo: <TEXTURES.TextureName> null,
+        hovered: {
+            object: <Body3> null,
+            distance: Infinity,
+        },
     };
 
     function reset() {
         state.camera.origin.setN(0, 0, 1000000000);
-        state.camera.angles.setN(0, Math.PI, 0);
+        state.camera.angles.setN(0, 0, 0);
         state.camera.d = 1;
 
         CAMERA_OBJ.body.velocity.setN(0, 0, 0);
+        CAMERA_OBJ.body.angleVelocity.setN(0, 0, 0);
+        CAMERA_OBJ.camera.angles.z = 0;
 
         state.lights.length = 0;
         state.objects.length = 0;
+    }
+
+    function beSatelliteOf(options: {
+        centerName: TEXTURES.TextureName;
+        distance: number;
+        k: number;
+    }) {
+        const centerBody = ENGINE.getBodyByName(options.centerName);
+
+        (centerBody instanceof Planet) && ENGINE.makeSatellite({
+            centerBody,
+            satelliteBody: CAMERA_OBJ.body,
+            distance: options.distance,
+            k: options.k,
+        });
     }
 
     const gkm = new GKM<
@@ -77,7 +122,8 @@
         'moveFast' | 'moveStop' |
         'zoomIn' | 'zoomOut' |
         'pause' | 'menu' | 'reset' |
-        'viewZ+' | 'viewZ-',
+        'viewZ+' | 'viewZ-' |
+        'fire' | 'aim',
         'viewX' | 'viewY' | 'zoom'
     >({
         keysBindings: {
@@ -96,6 +142,7 @@
             KeyP: 'pause', GAMEPAD_GUIDE: 'pause',
             KeyR: 'reset', GAMEPAD_START: 'reset',
             KeyQ: 'moveStop',
+            MOUSE_LEFT: 'fire', MOUSE_RIGHT: 'aim',
         },
         axesBindings: {
             MOUSE_MOVEMENT_X: 'viewX',
@@ -113,19 +160,34 @@
         state.camera.d *= value > 0 ? c : (1 / c);
     }
 
-    gkm.addListener('axismove', (axis, value) => {
+    function isInputElementActive() {
+        const activeTag = document.activeElement?.tagName;
+
+        return activeTag === 'INPUT' || activeTag === 'SELECT' ||
+            activeTag === 'OPTION' || activeTag === 'TEXTAREA';
+    }
+
+    gkm.addListener('axismove', (axis, value, src) => {
         // console.log(axis);
 
         if (document.pointerLockElement === canvas) {
-            if (axis === 'viewX')
-                state.camera.angles.y -= value / 1000 / state.camera.d;
-            
-            if (axis === 'viewY')
-                state.camera.angles.x -= value / 1000 / state.camera.d;
-        }
+            const rot = value / 1000 / state.camera.d;
 
-        if (axis === 'zoom') {
-            zoom(-value);
+            if (axis === 'viewX') {
+                const v = new Vector2(0, -rot).rotate(state.camera.angles.z);
+                state.camera.angles.y += v.y * state.camera.getInversionMultiplier();
+                state.camera.angles.x += v.x;
+            }
+            
+            if (axis === 'viewY') {
+                const v = new Vector2(rot, 0).rotate(state.camera.angles.z);
+                state.camera.angles.x += v.x;
+                state.camera.angles.y += v.y * state.camera.getInversionMultiplier();
+            }
+
+            if (axis === 'zoom') {
+                zoom(-value);
+            }
         }
     });
 
@@ -139,8 +201,24 @@
         if (key === 'reset') {
             reset();
         } else
-        if (key === 'moveStop') {
-            CAMERA_OBJ.body.velocity.setN(0, 0, 0);
+        if (key === 'fire') {
+            const { object } = ENGINE.staticMapper.tryGetFirstRayIntersected(
+                state.camera.getCenterRay(),
+            );
+
+            if (object instanceof Block) {
+                object.remove();
+            }
+        } else
+        if (key === 'aim') {
+            const ray = state.camera.getCenterRay();
+            const { object, distance } = ENGINE.staticMapper.tryGetFirstRayIntersected(ray);
+
+            if (object instanceof Block) {
+                object.addBlockOnFace(
+                    object.geometry.getNormalToPoint(ray.getPointByDistance(distance)),
+                );
+            }
         }
     });
 
@@ -157,9 +235,21 @@
         canvas.height = sz.y;
 
         ut.gl.viewport(0, 0, sz.x, sz.y);
+
+        state.camera.sizes.setN(sz.x, sz.y);
     }
 
     function checkKeys() {
+        if (isInputElementActive()) {
+            return;
+        }
+
+        if (gkm.getKeyValue('moveStop')) {
+            CAMERA_OBJ.body.velocity.setN(0, 0, 0);
+            CAMERA_OBJ.body.angleVelocity.setN(0, 0, 0);
+            CAMERA_OBJ.camera.angles.z = 0;
+        }
+
         zoom(+gkm.getKeyValue('zoomIn'));
         zoom(-gkm.getKeyValue('zoomOut'));
 
@@ -168,80 +258,92 @@
 
         const maxAcceleration = state.acceleration * (gkm.isKeyPressed('moveFast') ? state.accelerationBoost : 1);
 
-        const tmp = new Vector3();
+        // const dir = state.camera.getDirection();
 
-        tmp.x -= gkm.getKeyValue('moveLeft');
-        tmp.x += gkm.getKeyValue('moveRight');
-        tmp.y -= gkm.getKeyValue('moveDown');
-        tmp.y += gkm.getKeyValue('moveUp');
-        tmp.z -= gkm.getKeyValue('moveBack');
-        tmp.z += gkm.getKeyValue('moveFront');
+        const acceleration = new Vector3()
+            // .plus(dir.clone().rotateY(Math.PI/2).multiplyN(gkm.getKeyValue('moveLeft')))
+            // .plus(dir.clone().rotateY(-Math.PI/2).multiplyN(gkm.getKeyValue('moveRight')))
+            // .plus(dir.clone().rotateX(Math.PI/2).multiplyN(gkm.getKeyValue('moveDown')))
+            // .plus(dir.clone().rotateX(-Math.PI/2).multiplyN(gkm.getKeyValue('moveUp')))
+            // .plus(dir.clone().multiplyN(gkm.getKeyValue('moveBack')))
+            // .plus(dir.clone().multiplyN(-gkm.getKeyValue('moveFront')));
 
-        const m = Matrix.createRotation3x3FromAnglesVector(state.camera.angles);
+        acceleration.x -= gkm.getKeyValue('moveLeft');
+        acceleration.x += gkm.getKeyValue('moveRight');
+        acceleration.y -= gkm.getKeyValue('moveDown');
+        acceleration.y += gkm.getKeyValue('moveUp');
+        acceleration.z -= gkm.getKeyValue('moveBack');
+        acceleration.z += gkm.getKeyValue('moveFront');
 
-        const acceleration = m.multiplyVector3Column(tmp);
+        acceleration.rotateZXY(state.camera.angles);
+
+        // const im = state.camera.getInversionMultiplier();
+        // acceleration.x *= im;
+        // acceleration.y *= im;
 
         acceleration.normalize(maxAcceleration * Math.min(
             1,
             acceleration.length(),
         ));
 
-        return {
-            acceleration,
-        };
+        CAMERA_OBJ.body.acceleration.set(acceleration.multiplyN(1 / state.timeMultiplier ** 2));
     }
 
     function checkGui() {
-        if (state.lightsCount > state.lights.length) {
-            const count = state.lightsCount - state.lights.length;
-            for (let i=0; i<count; ++i) {
-                const object = state.OBJECTS.stars[state.lights.length % state.OBJECTS.stars.length]
-                    .clone();
-                // object.geometry.center.set(Vector3.createRandom(10000, -10000));
-                state.lights.push(object);
+        for (const [key, enabled] of Object.entries(state.selectedStars)) {
+            const star = <TEXTURES.TextureName> key;
+            const exists = ENGINE.getBodyByGroupAndName('stars', star);
+            if (!enabled && exists) {
+                ENGINE.removeBodyByName(star);
+            } else
+            if (enabled && !exists) {
+                const info = OBJECTS.stars[star];
+                const body = info.body.clone();
+                ENGINE.addBodyByNameAndGroup(body, star, 'stars');
+
+                if (info.satelliteOf) {
+                    const centerBody = ENGINE.getBodyByName(info.satelliteOf);
+                    (centerBody instanceof RigidBody3) && ENGINE.makeSatellite({
+                        centerBody,
+                        satelliteBody: body,
+                        distance: 1.0 * (info.orbitRadius - centerBody.geometry.radius - body.geometry.radius),
+                    });
+                }
+
+                // TODO: remove
+                state.ENGINE.G = 0;
+                body.velocity.multiplyN(0);
+                body.angleVelocity.multiplyN(0);
             }
-        } else {
-            state.lights.length = Math.max(0, state.lightsCount || 0);
         }
 
-        if (state.objectsCount > state.objects.length) {
-            const count = state.objectsCount - state.objects.length;
-            for (let i=0; i<count; ++i) {
-                const object = state.OBJECTS.planets[state.objects.length % state.OBJECTS.planets.length]
-                    .clone();
+        for (const [key, enabled] of Object.entries(state.selectedPlanets)) {
+            const planet = <TEXTURES.TextureName> key;
+            const exists = ENGINE.getBodyByGroupAndName('planets', planet);
+            if (!enabled && exists) {
+                ENGINE.removeBodyByName(planet);
+            } else
+            if (enabled && !exists) {
+                const info = OBJECTS.planets[planet];
+                // console.log(planet, info);
+                const body = info.body.clone();
+                ENGINE.addBodyByNameAndGroup(body, planet, 'planets');
 
-                if (state.objects.length === 0) {
-                    object.geometry.center.setN(0, 0, 0);
-                } else {
-                    const po = state.objects[state.objects.length-1];
-                    object.geometry.center.setN(
-                        po.geometry.center.x + po.geometry.radius + object.geometry.radius + 7e7,
-                        0,
-                        -(po.geometry.center.z + po.geometry.radius + object.geometry.radius + 7e8),
-                    );
-                }
-
-                if (state.objects.length === 3) {
-                    ENGINE.makeSattellite({
-                        centerBody: state.objects[state.objects.length-1],
-                        satelliteBody: object,
-                        distance: 1e6,
-                    });
-                } else if (state.lights.length) {
-                    ENGINE.makeSattellite({
-                        centerBody: state.lights[0],
-                        satelliteBody: object,
-                        // distance: 1e6,
+                if (info.satelliteOf) {
+                    const centerBody = ENGINE.getBodyByName(info.satelliteOf);
+                    const distance = 1.000001 * (info.orbitRadius - centerBody.geometry.radius - body.geometry.radius);
+                    (centerBody instanceof RigidBody3) && ENGINE.makeSatellite({
+                        centerBody,
+                        satelliteBody: body,
+                        distance, //: centerBody.geometry.radius + Helpers.rand(100000),
                     });
                 }
-                // object.geometry.center.set(Vector3.createRandom(
-                //         1 * object.geometry.radius,
-                //         -1 * object.geometry.radius
-                // ));
-                state.objects.push(object);
+
+                // TODO: remove
+                state.ENGINE.G = 0;
+                body.velocity.multiplyN(0);
+                body.angleVelocity.multiplyN(0);
             }
-        } else {
-            state.objects.length = Math.max(0, state.objectsCount || 0);
         }
     }
 
@@ -258,64 +360,95 @@
 
         checkGui();
         checkResolution();
+        checkKeys();
 
         const dt = onFrame() / 1000 * state.timeMultiplier;
         state.time += dt;
 
-        // state.infoText = dt.toString();
+        ENGINE.removeBodiesByGroup('blocks');
 
-        const { acceleration } = checkKeys();
-        CAMERA_OBJ.body.acceleration.set(acceleration.multiplyN(1 / state.timeMultiplier ** 2));
+        const planet = ENGINE.rigidMapper.tryGetClosestTo(CAMERA_OBJ.body);
 
-        const MO = 12;
-        const BO = MO + 8;
-        const SS = 12;
+        if (planet instanceof Planet) {
+            const blocks = planet.getPlayerNearBlocks(state.camera, CAMERA_OBJ.body);
 
-        const f32a = new Float32Array(BO + SS * 100);
-        const i32a = new Int32Array(f32a.buffer);
-
-        const rotationMatrix = Matrix.createRotation3x3FromAnglesVector(state.camera.angles);
-
-        rotationMatrix.putToArray(f32a, 0);
-
-        state.resolution.putToArray(f32a, MO + 0);
-
-        f32a[MO + 2] = state.camera.d;
-        f32a[MO + 3] = state.camera.distance;
-        i32a[MO + 4] = state.lights.length;
-        i32a[MO + 5] = state.lights.length + state.objects.length;
-
-        const bodies = [...state.lights, ...state.objects];
-
-        ENGINE.clearBodies();
-        ENGINE.addBodies(bodies);
-        ENGINE.addBody(CAMERA_OBJ.body);
+            for (let i=0; i<blocks.length; ++i) {
+                ENGINE.addBodyByNameAndGroup(blocks[i], <any> `block_${i}`, 'blocks');
+            }
+        }
 
         ENGINE.calcStep(dt);
+        state.hovered = ENGINE.staticMapper.tryGetFirstRayIntersected(
+            state.camera.getCenterRay(),
+        );
 
-        for (let i=0; i<bodies.length; ++i) {
-            const offset = BO + SS * i;
-            const ds: DrawableSphere<TEXTURES.TextureName> = <any> bodies[i].geometry;
-
-            ds.putToArray(f32a, offset, state.camera.origin);
-            i32a[offset + 7] = ut.getTextureIndex(ds.textureName);
-            f32a[offset + 10] = ds.radius * 1.3;
+        if (!state.hovered.object) {
+            state.hovered = ENGINE.rigidMapper.tryGetFirstRayIntersected(
+                state.camera.getCenterRay(),
+                CAMERA_OBJ.body,
+            );
         }
+
+        if (state.hovered.object instanceof Block) {
+            state.hovered.object.highlight();
+        }
+
+        const blocks = ENGINE.getBodiesByGroup('blocks');
+
+        const stars = ENGINE.getBodiesByGroup('stars');
+        const planets = ENGINE.getBodiesByGroup('planets');
+
+        if (state.hovered.object) {
+            const point = state.camera.getCenterRay().getPointByDistance(state.hovered.distance);
+            point.plus(state.hovered.object.geometry.getNormalToPoint(point).multiplyN(0.2));
+            planets.push(new Body3({
+                geometry: new DrawableSphere({
+                    center: point,
+                    radius: 0.1,
+                    color: new Vector3(100, 0, 0),
+                }),
+            }));
+        }
+
+        if (ENGINE.getBodyByName(state.lockViewOn)) {
+            const body = ENGINE.getBodyByName(state.lockViewOn);
+            state.camera.lookAt(body.geometry.center);
+        }
+
+        let info = `Aim (distance: ${NUF.format(state.hovered.distance - CAMERA_OBJ.body.geometry.radius)}; type: ${state.hovered.object?.['constructor'].name || 'None'}); Blocks: ${blocks.length}`;
+
+        if (ENGINE.getBodyByName(state.showDistanceTo)) {
+            const body = ENGINE.getBodyByName(state.showDistanceTo);
+            const distance = CAMERA_OBJ.body.geometry.getSignedDistanceTo(body.geometry);
+
+            info += `;\nDistance to ${Helpers.capitalizeFirstLetter(state.showDistanceTo)} is ${NUF.format(distance)}`;
+        }
+
+        state.info.show(info);
         
-        ut.updateUniformBuffer(state.uniforms.buffer, f32a.buffer);
+        const buffer = Renderer.fillBufferRaytracing({
+            camera: state.camera,
+            lights: stars.map(s => <IDrawableGeometry> s.geometry),
+            objects: [...blocks, ...planets].map(o => <IDrawableGeometry> o.geometry),
+        });
+
+        // state.isPause = true;
+        // return;
+        
+        ut.updateUniformBuffer(state.uniforms.buffer, buffer);
 
         ut.gl.drawArrays(ut.gl.TRIANGLE_STRIP, 0, 4);
     };
 
     onMount(async () => {
         try {
-        state.infoText = 'WebGL initializing';
+        state.info.show('WebGL initializing', true);
         ut = new Gl2Utils(<any> canvas.getContext('webgl2', {
             saveDrawingBuffer: true,
             preserveDrawingBuffer: true,
         }));
 
-        state.infoText = 'Shaders compiling';
+        state.info.show('Shaders compiling', true);
         const program = ut.createProgram({
             use: true,
             shaders: [
@@ -324,7 +457,7 @@
             ],
         });
 
-        state.infoText = 'Getting memory links';
+        state.info.show('Getting memory links', true);
 
         state.program = program;
         state.attributes.positions = ut.getAttribLocation(program, 'position');
@@ -347,26 +480,21 @@
         globalThis['ut'] = ut;
         globalThis['gkm'] = gkm;
 
-        ut.reserveTextureIndex('space', 0);
-        ut.reserveTextureIndex('sun', 1);
+        state.info.show('Loading textures', true);
 
-        const TEXPART: any = {
-            space: TEXTURES.space,
-            sun: TEXTURES.sun,
-            earth: TEXTURES.earth,
-        }
-
-        state.infoText = 'Loading textures';
-
-        await ut.createLoadBindTextures(TEXTURES, {
+        const gen = ut.createLoadBindTextures(Texture.getAll(), {
             program,
             samplersNamePrefix: 'SAMPLER',
             // maxWidth: 512, maxHeight: 512,
         });
 
+        for await (const texture of gen) {
+            state.info.show(`Texture: ${texture.source.rawSource}`, true);
+        }
+
         reset();
 
-        state.infoText = 'Starting';
+        state.info.show('Starting');
         draw();
         } catch (error) {
             alert('' + error + error.stack);
@@ -375,6 +503,7 @@
 
     onDestroy(() => {
         state.isDestroyed = true;
+        state.info.destroy();
         gkm.destroy();
     });
 
@@ -393,7 +522,7 @@
 
 //         e.touches[0]['index'] ??= Date.now();
 
-//         state.infoText = `Touches count: ${e.touches?.length.toString()}\n
+//         state.info.show(`Touches count: ${e.touches?.length.toString()}\n
 // Touch[0] info: ${Object.keys(e.touches[0]['__proto__']).join(', ')}`;
 
         if (e['scale']) {
@@ -403,7 +532,6 @@
 ></canvas>
 <Fps
     bind:onFrame={onFrame} bind:isPause={state.isPause}
-    style='left: unset; right: 10px; bottom: 10px; top: unset;'
 ></Fps>
 
 <Menu
@@ -415,13 +543,14 @@
     bind:acceleration={state.acceleration}
     bind:accelerationBoost={state.accelerationBoost}
     bind:timeMultiplier={state.timeMultiplier}
-    bind:lightOrbitPeriod={state.lightLoopPeriod}
-    bind:lightOrbitRadius={state.lightLoopRadius}
-    bind:lightsCount={state.lightsCount}
-    bind:objectsCount={state.objectsCount}
+    bind:stars={state.selectedStars}
+    bind:planets={state.selectedPlanets}
+    bind:lockViewOn={state.lockViewOn}
+    bind:showDistanceTo={state.showDistanceTo}
+    beSatelliteOf={beSatelliteOf}
 ></Menu>
 
-<Info text={state.infoText}></Info>
+<!-- <HoveredElement bind:element={state.hoveredElement}></HoveredElement> -->
 
 <style>
     canvas {

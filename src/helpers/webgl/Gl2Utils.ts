@@ -1,4 +1,5 @@
 import { Vector4 } from "../../libs/math/Vector4";
+import type { Texture } from "../../libs/render/Texture";
 import { Helpers } from "../common";
 
 type Gl2ShaderType = WebGL2RenderingContext['VERTEX_SHADER'] |
@@ -10,9 +11,9 @@ type TEXTURE_INDEX =
     20|21|22|23|24|25|26|27|28|29|
     30|31;
 
-interface TextureConfig<TextureName extends string> {
-    readonly name: TextureName;
-    readonly index: TEXTURE_INDEX;
+interface TextureConfig {
+    readonly source: Texture;
+    readonly mipMap: boolean;
     readonly type: number;
     readonly texture: WebGLTexture;
     readonly level: number;
@@ -20,15 +21,10 @@ interface TextureConfig<TextureName extends string> {
     readonly border: number;
     readonly srcFormat: number;
     readonly srcType: number;
-    readonly mipMap: boolean;
-    width: number;
-    height: number;
-    readonly maxWidth?: number;
-    readonly maxHeight?: number;
 }
 
 export class Gl2Utils<TextureName extends string = null> {
-    private readonly texturesMap = new Map<TextureName, TextureConfig<TextureName>>();
+    private readonly textures = new Set<TextureConfig>();
 
     constructor(public gl: WebGL2RenderingContext) { }
 
@@ -115,151 +111,99 @@ export class Gl2Utils<TextureName extends string = null> {
     }
 
     createTexture(options: {
-        name: TextureName;
-        baseColor?: Vector4;
+        source: Texture;
         mipMap?: boolean;
-        maxWidth?: number;
-        maxHeight?: number;
     }) {
-        options.baseColor ??= new Vector4(0.5, 0.5, 0.5, 1.0);
         options.mipMap ??= false;
 
         const type = this.gl.TEXTURE_2D;
         const texture = this.gl.createTexture();
         this.gl.bindTexture(type, texture);
 
-        const config: TextureConfig<TextureName> = {
-            name: options.name,
-            index: this.getTextureIndex(options.name),
+        const config: TextureConfig = {
+            source: options.source,
             type,
             texture,
             level: 0,
             internalFormat: this.gl.RGBA,
-            width: 1,
-            height: 1,
             border: 0,
             srcFormat: this.gl.RGBA,
             srcType: this.gl.UNSIGNED_BYTE,
             mipMap: options.mipMap,
-            maxWidth: options.maxWidth,
-            maxHeight: options.maxHeight,
         };
 
         const pixel = config.srcType === this.gl.UNSIGNED_BYTE ?
-            options.baseColor.getNormBytes() :
-            options.baseColor.getNormFloats();
+            options.source.baseColor.getNormBytes() :
+            options.source.baseColor.getNormFloats();
 
         this.gl.texImage2D(
-            this.gl.TEXTURE_2D,
+            config.type,
             config.level,
             config.internalFormat,
-            config.width,
-            config.height,
+            1, // config.source.width,
+            1, // config.source.height,
             config.border,
             config.srcFormat,
             config.srcType,
-            pixel
+            pixel,
         );
 
-        this.texturesMap.set(config.name, config);
+        this.textures.add(config);
 
         return config;
     }
 
-    async loadTexture(config: TextureConfig<TextureName>, url: string) {
-        const promise = new Helpers.PromiseManaged<TextureConfig<TextureName>>();
+    async loadTexture(config: TextureConfig) {
+        await config.source.load();
+        
+        // console.log(config.source.width, config.source.height, config);
 
-        const image = new Image();
-        // image.crossOrigin = "anonymous";
+        this.gl.bindTexture(config.type, config.texture);
+        this.gl.texImage2D(
+            config.type,
+            config.level,
+            config.internalFormat,
+            config.srcFormat,
+            config.srcType,
+            config.source.canvas,
+        );
+        
+        // console.log(config.source);
+        
+        if (config.mipMap && config.source.isSizesPow2()) {
+            this.gl.generateMipmap(config.type);
+        } else {
+            this.gl.texParameteri(config.type, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
+            this.gl.texParameteri(config.type, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
+            // this.gl.texParameteri(config.type, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
+            this.gl.texParameteri(config.type, this.gl.TEXTURE_MIN_FILTER, this.gl.NEAREST);
 
-        image.onload = () => {
-            let source: HTMLImageElement | HTMLCanvasElement | OffscreenCanvas = image;
-
-            if (config.maxWidth && config.maxHeight && (
-                image.width > config.maxWidth ||
-                image.height > config.maxHeight
-            )) {
-                const factor = Math.max(
-                    image.width / config.maxWidth,
-                    image.height / config.maxHeight,
-                );
-
-                const canvas = Helpers.createOffscreenCanvas(
-                    (image.width / factor) >> 0,
-                    (image.height / factor) >> 0,
-                );
-
-                canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
-
-                source = canvas;
-            }
-
-            config.width = source.width;
-            config.height = source.height;
-
-            this.gl.bindTexture(config.type, config.texture);
-            this.gl.texImage2D(
-                config.type,
-                config.level,
-                config.internalFormat,
-                config.srcFormat,
-                config.srcType,
-                source,
-            );
-            
-            if (config.mipMap && Helpers.isPow2(image.width) && Helpers.isPow2(image.height)) {
-                this.gl.generateMipmap(config.type);
-            } else {
-                this.gl.texParameteri(config.type, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
-                this.gl.texParameteri(config.type, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
-                // this.gl.texParameteri(config.type, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
-                this.gl.texParameteri(config.type, this.gl.TEXTURE_MIN_FILTER, this.gl.NEAREST);
-
-                // glTexParameterf(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_WRAP_S, GL_CLAMP); 
-                // glTexParameterf(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_WRAP_T, GL_CLAMP);
-            }
-
-            promise.resolve(config);
-        };
-
-        image.onerror = (error) => {
-            alert(error);
-            promise.reject(error);
-        };
-
-        image.src = url;
-
-        return promise.promise;
+            // glTexParameterf(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_WRAP_S, GL_CLAMP); 
+            // glTexParameterf(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_WRAP_T, GL_CLAMP);
+        }
     }
 
-    bindTexture(config: TextureConfig<TextureName>) {
-        if (!config.texture) {
-            return;
-        }
-
-        this.gl.activeTexture(this.gl[`TEXTURE${config.index}`]);
+    bindTexture(config: TextureConfig) {
+        this.gl.activeTexture(this.gl[`TEXTURE${config.source.index}`]);
         this.gl.bindTexture(config.type, config.texture);
     }
 
     rebindTextures() {
-        for (const config of this.texturesMap.values()) {
+        for (const config of this.textures) {
             this.bindTexture(config);
         }
     }
 
-    async createLoadBindTextures(dict: Record<TextureName, string>, options?: {
+    async * createLoadBindTextures(list: Texture[], options?: {
         program: WebGLProgram;
         samplersNamePrefix: string;
         maxWidth?: number;
         maxHeight?: number;
+        mipMap?: boolean
     }) {
-        // TODO: remove
-        // return;
-        const entries: [TextureName, string][] = <any> Object.entries(dict);
-        
-        if (entries.length + this.getTexturesCount() > 32) {
+        if (list.length + this.getTexturesCount() > 32) {
             throw new Error(
-                `Too many textures (${entries.length} + ${this.getTexturesCount()}). Max: 32`,
+                `Too many textures (${list.length} + ${this.getTexturesCount()}). Max: 32`,
             );
         }
 
@@ -267,14 +211,24 @@ export class Gl2Utils<TextureName extends string = null> {
             this.initSamplersArray(options.program, options.samplersNamePrefix, 32);
         }
 
-        for (const [name, url] of entries) {
+        for (const source of list) {
+            source.options.maxWidth = Math.min(
+                source.options.maxWidth || options.maxWidth,
+                options.maxWidth || source.options.maxWidth,
+            ) || undefined;
+            source.options.maxHeight = Math.min(
+                source.options.maxHeight || options.maxHeight,
+                options.maxHeight || source.options.maxHeight,
+            ) || undefined;
+
             const config = this.createTexture({
-                name,
-                maxWidth: options?.maxWidth,
-                maxHeight: options?.maxHeight,
+                source,
+                mipMap: options.mipMap,
             });
 
-            await this.loadTexture(config, url);
+            yield config;
+
+            await this.loadTexture(config);
             // this.bindTexture(config);
 
             // TODO: try to understand
@@ -282,60 +236,8 @@ export class Gl2Utils<TextureName extends string = null> {
         }
     }
 
-    getTextureIndex(name: TextureName) {
-        // TODO: remove
-        // return -1;
-        const config = this.texturesMap.get(name);
-
-        if (!config) {
-            const index = <TEXTURE_INDEX> this.getTexturesCount();
-            this.texturesMap.set(name, <any>{ index });
-            
-            return index;
-        }
-
-        return config.index;
-    }
-
-    reserveTextureIndex(name: TextureName, index: number) {
-        // TODO: remove
-        // return -1;
-        const existingConfig = this.texturesMap.get(name);
-
-        if (existingConfig && existingConfig.index !== index) {
-            throw new Error(`Texture '${name}' already exists with other index ${index}`);
-        }
-
-        if (this.texturesMap.size !== index) {
-            throw new Error(`Cannot bind texture '${name}' to index ${index}`);
-        }
-
-        return this.getTextureIndex(name);
-    }
-
-    getTexturesIndexes() {
-        return <Record<TextureName, TEXTURE_INDEX>> Object.fromEntries(
-            [...this.texturesMap.entries()].map(e => [e[0], e[1].index]),
-        );
-    }
-
-    getRandomTextureIndex(from = 0) {
-        return Helpers.randInt(this.getTexturesCount(), from);
-    }
-
-    getModuloNextTextureIndex(objectsCount: number, excludeFirst = 0) {
-        const base = this.getTexturesCount() - excludeFirst;
-        const result = excludeFirst + (objectsCount % base);
-
-        if (result < 0 || this.getTexturesCount() < result) {
-            return -1;
-        }
-
-        return result;
-    }
-
     getTexturesCount() {
-        return this.texturesMap.size;
+        return this.textures.size;
     }
 
     // TODO: remove

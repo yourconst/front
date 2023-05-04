@@ -25,41 +25,53 @@ export class AABB3 {
     }
 
     constructor(
-        public start = new Vector3(Infinity, Infinity, Infinity),
-        public end = start?.clone() ?? new Vector3(-Infinity, -Infinity, -Infinity),
+        public min = new Vector3(Infinity, Infinity, Infinity),
+        public max = min?.clone() ?? new Vector3(-Infinity, -Infinity, -Infinity),
     ) { }
 
     clear() {
-        this.start.setN(Infinity, Infinity, Infinity);
-        this.end.setN(-Infinity, -Infinity, -Infinity);
+        this.min.setN(Infinity, Infinity, Infinity);
+        this.max.setN(-Infinity, -Infinity, -Infinity);
         return this;
     }
     
     clone() {
-        return new AABB3(this.start.clone(), this.end.clone());
+        return new AABB3(this.min.clone(), this.max.clone());
     }
 
     isValid() {
-        return Range.isValid(this.start.x, this.end.x) &&
-            Range.isValid(this.start.y, this.end.y) &&
-            Range.isValid(this.start.z, this.end.z);
+        return Range.isValid(this.min.x, this.max.x) &&
+            Range.isValid(this.min.y, this.max.y) &&
+            Range.isValid(this.min.z, this.max.z);
+    }
+
+    getSize() {
+        return new Vector3(
+            this.max.x - this.min.x,
+            this.max.y - this.min.y,
+            this.max.z - this.min.z,
+        );
+    }
+
+    isEquals(b: AABB3) {
+        return this.min.isEquals(b.min) && this.max.isEquals(b.max);
     }
 
     checkUpdate() {
-        this.start.minSet(this.end);
-        this.end.maxSet(this.start);
+        this.min.minSet(this.max);
+        this.max.maxSet(this.min);
         return this;
     }
 
     updateByAABB(aabb: AABB3) {
-        this.start.minSet(aabb.start);
-        this.end.maxSet(aabb.end);
+        this.min.minSet(aabb.min);
+        this.max.maxSet(aabb.max);
         return this;
     }
 
     updateByPoint(point: Vector3) {
-        this.start.minSet(point);
-        this.end.maxSet(point);
+        this.min.minSet(point);
+        this.max.maxSet(point);
         return this;
     }
 
@@ -71,45 +83,51 @@ export class AABB3 {
     }
 
     updateByCenterRadius(center: Vector3, r: number) {
-        this.start.minSetN(center.x - r, center.y - r, center.z - r);
-        this.start.maxSetN(center.x + r, center.y + r, center.z + r);
+        this.min.minSetN(center.x - r, center.y - r, center.z - r);
+        this.max.maxSetN(center.x + r, center.y + r, center.z + r);
+        return this;
+    }
+
+    setByCenterRadius(center: Vector3, r: number) {
+        this.max.setN(center.x - r, center.y - r, center.z - r);
+        this.min.setN(center.x + r, center.y + r, center.z + r);
         return this;
     }
 
     isPointInside(point: Vector3) {
-        return Range.isValueInside(point.x, this.start.x, this.end.x) &&
-            Range.isValueInside(point.y, this.start.y, this.end.y) &&
-            Range.isValueInside(point.z, this.start.z, this.end.z);
+        return Range.isValueInside(point.x, this.min.x, this.max.x) &&
+            Range.isValueInside(point.y, this.min.y, this.max.y) &&
+            Range.isValueInside(point.z, this.min.z, this.max.z);
     }
 
     isAABBCollided(aabb: AABB3) {
-        return Range.isRangesCollided(this.start.x, this.end.x, aabb.start.x, aabb.end.x) &&
-            Range.isRangesCollided(this.start.y, this.end.y, aabb.start.y, aabb.end.y) &&
-            Range.isRangesCollided(this.start.z, this.end.z, aabb.start.z, aabb.end.z);
+        return Range.isRangesCollided(this.min.x, this.max.x, aabb.min.x, aabb.max.x) &&
+            Range.isRangesCollided(this.min.y, this.max.y, aabb.min.y, aabb.max.y) &&
+            Range.isRangesCollided(this.min.z, this.max.z, aabb.min.z, aabb.max.z);
     }
 
     _getCollisionAABB(aabb: AABB3) {
-        const x = Range._getCollisionRange(this.start.x, this.end.x, aabb.start.x, aabb.end.x);
-        const y = Range._getCollisionRange(this.start.y, this.end.y, aabb.start.y, aabb.end.y);
-        const z = Range._getCollisionRange(this.start.z, this.end.z, aabb.start.z, aabb.end.z);
+        const x = Range._getCollisionRange(this.min.x, this.max.x, aabb.min.x, aabb.max.x);
+        const y = Range._getCollisionRange(this.min.y, this.max.y, aabb.min.y, aabb.max.y);
+        const z = Range._getCollisionRange(this.min.z, this.max.z, aabb.min.z, aabb.max.z);
 
         return new AABB3(
-            new Vector3(x.start, y.start, z.start),
-            new Vector3(x.end, y.end, z.end),
+            new Vector3(x.min, y.min, z.min),
+            new Vector3(x.max, y.max, z.max),
         );
     }
     
     tryGetCollisionAABB(aabb: AABB3) {
-        const x = Range._getCollisionRange(this.start.x, this.end.x, aabb.start.x, aabb.end.x);
+        const x = Range._getCollisionRange(this.min.x, this.max.x, aabb.min.x, aabb.max.x);
         if (!x.isValid()) return null;
-        const y = Range._getCollisionRange(this.start.y, this.end.y, aabb.start.y, aabb.end.y);
+        const y = Range._getCollisionRange(this.min.y, this.max.y, aabb.min.y, aabb.max.y);
         if (!y.isValid()) return null;
-        const z = Range._getCollisionRange(this.start.z, this.end.z, aabb.start.z, aabb.end.z);
+        const z = Range._getCollisionRange(this.min.z, this.max.z, aabb.min.z, aabb.max.z);
         if (!z.isValid()) return null;
 
         return new AABB3(
-            new Vector3(x.start, y.start, z.start),
-            new Vector3(x.end, y.end, z.end),
+            new Vector3(x.min, y.min, z.min),
+            new Vector3(x.max, y.max, z.max),
         );
     }
 }

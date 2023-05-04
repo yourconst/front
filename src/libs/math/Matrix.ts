@@ -111,3 +111,5 @@ export class Matrix {
         );
     }
 }
+
+globalThis['Matrix'] = Matrix;

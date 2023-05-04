@@ -20,6 +20,8 @@
   },
   "dependencies": {
     "@types/node": "^18.15.11",
-    "eventemitter3": "^5.0.0"
+    "@types/three": "^0.151.0",
+    "eventemitter3": "^5.0.0",
+    "three": "^0.152.2"
   }
 }
