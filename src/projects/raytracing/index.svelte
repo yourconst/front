@@ -51,7 +51,7 @@
     let ut: Gl2Utils<TEXTURES.TextureName>;
     const state = {
         isDestroyed: false,
-        isPause: true,
+        isPause: false,
         isMenu: false,
         info: new Info(),
         // hoveredElement: <HTMLElement> null,
@@ -91,7 +91,7 @@
     function reset() {
         state.camera.origin.setN(0, 0, 1000000000);
         state.camera.angles.setN(0, 0, 0);
-        state.camera.d = 1;
+        state.camera.d = 0.4;
 
         CAMERA_OBJ.body.velocity.setN(0, 0, 0);
         CAMERA_OBJ.body.angleVelocity.setN(0, 0, 0);
