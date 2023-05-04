@@ -5,7 +5,7 @@
     import { Gl2Utils } from "../../helpers/webgl/Gl2Utils";
     import { Vector2 } from "../../libs/math/Vector2";
     import { Vector3 } from "../../libs/math/Vector3";
-    import * as SHADERS from "./shaders";
+    import * as SHADERS from "./shaders/index";
     import type * as TEXTURES from "./textures";
     import { Matrix } from "../../libs/math/Matrix";
     import { Matrix3x3 } from "../../libs/math/Matrix3x3";
@@ -20,10 +20,11 @@
     import { CONSTANTS } from "./configs/constants";
     import { Info } from "./components/Info";
     import { Block, Planet } from "./physics/Planet";
-    import { Body3 } from "../../libs/physics/Body3";
+    import type { Body3 } from "../../libs/physics/Body3";
     import { Texture } from "../../libs/render/Texture";
     import { Renderer } from "./shaders/Renderer";
     import type { IDrawableGeometry } from "../../libs/drawableGeometry/DrawableGeometry";
+  import { ExposureCalculator } from "../../libs/render/ExposureCalculator";
 //   import HoveredElement from "./components/HoveredElement.svelte";
 
     const NUF = new Helpers.NumberUnitFormatter([
@@ -55,6 +56,12 @@
         isMenu: false,
         info: new Info(),
         // hoveredElement: <HTMLElement> null,
+        cursor: {
+            program: <WebGLProgram> null,
+            attributes: {
+                positions: <number> null,
+            },
+        },
         program: <WebGLProgram> null,
         attributes: {
             positions: <number> null,
@@ -74,6 +81,7 @@
         accelerationBoost: 10,
         time: 0,
         timeMultiplier: 1,
+        autoExposure: new ExposureCalculator(),
         selectedStars:
             <Record<TEXTURES.TextureName, boolean>>
             Object.fromEntries(Object.keys(OBJECTS.stars).map(n => [n, true])),
@@ -398,24 +406,14 @@
         const stars = ENGINE.getBodiesByGroup('stars');
         const planets = ENGINE.getBodiesByGroup('planets');
 
+        let info = `Aim (distance:${NUF.format(state.hovered.distance - CAMERA_OBJ.body.geometry.radius)}`;
         if (state.hovered.object) {
-            const point = state.camera.getCenterRay().getPointByDistance(state.hovered.distance);
-            point.plus(state.hovered.object.geometry.getNormalToPoint(point).multiplyN(0.2));
-            planets.push(new Body3({
-                geometry: new DrawableSphere({
-                    center: point,
-                    radius: 0.1,
-                    color: new Vector3(100, 0, 0),
-                }),
-            }));
+            info += `; type:${state.hovered.object['constructor'].name}`;
+            if (state.hovered.object instanceof Planet) {
+                info += `; name:${Helpers.capitalizeFirstLetter(state.hovered.object['name'])}`;
+            }
         }
-
-        if (ENGINE.getBodyByName(state.lockViewOn)) {
-            const body = ENGINE.getBodyByName(state.lockViewOn);
-            state.camera.lookAt(body.geometry.center);
-        }
-
-        let info = `Aim (distance: ${NUF.format(state.hovered.distance - CAMERA_OBJ.body.geometry.radius)}; type: ${state.hovered.object?.['constructor'].name || 'None'}); Blocks: ${blocks.length}`;
+        info += `); Blocks:${blocks.length}`;
 
         if (ENGINE.getBodyByName(state.showDistanceTo)) {
             const body = ENGINE.getBodyByName(state.showDistanceTo);
@@ -431,13 +429,20 @@
             lights: stars.map(s => <IDrawableGeometry> s.geometry),
             objects: [...blocks, ...planets].map(o => <IDrawableGeometry> o.geometry),
         });
-
-        // state.isPause = true;
-        // return;
         
-        ut.updateUniformBuffer(state.uniforms.buffer, buffer);
+        state.camera.exposure = state.autoExposure.calc(state.camera.exposure, ut);
 
+        ut.gl.useProgram(state.program);
+        ut.updateUniformBuffer(state.uniforms.buffer, buffer);
         ut.gl.drawArrays(ut.gl.TRIANGLE_STRIP, 0, 4);
+
+        // ut.gl.useProgram(state.cursor.program);
+        // ut.gl.drawArrays(ut.gl.TRIANGLE_FAN, 0, 6);
+
+        if (ENGINE.getBodyByName(state.lockViewOn)) {
+            const body = ENGINE.getBodyByName(state.lockViewOn);
+            state.camera.lookAt(body.geometry.center);
+        }
     };
 
     onMount(async () => {
@@ -449,21 +454,43 @@
         }));
 
         state.info.show('Shaders compiling', true);
-        const program = ut.createProgram({
+
+
+        state.cursor.program = ut.createProgram({
             use: true,
             shaders: [
-                ut.compileShader(SHADERS.vertex.source, ut.gl.VERTEX_SHADER),
-                ut.compileShader(SHADERS.fragment.source, ut.gl.FRAGMENT_SHADER),
+                ut.compileShader(SHADERS.cursor.vertex.source, ut.gl.VERTEX_SHADER),
+                ut.compileShader(SHADERS.cursor.fragment.source, ut.gl.FRAGMENT_SHADER),
             ],
         });
 
-        state.info.show('Getting memory links', true);
+        state.cursor.attributes.positions = ut.getAttribLocation(state.cursor.program, 'position');
+
+        ut.bindBuffer(SHADERS.cursor.vertex.data);
+        ut.gl.enableVertexAttribArray(state.cursor.attributes.positions);
+        ut.gl.vertexAttribPointer(
+            state.cursor.attributes.positions,
+            2, // position is a vec2 (2 values per component)
+            ut.gl.FLOAT, // each component is a float
+            false, // don't normalize values
+            2 * 4, // two 4 byte float components per vertex (32 bit float is 4 bytes)
+            0 // how many bytes inside the buffer to start from
+        );
+
+
+        const program = ut.createProgram({
+            use: true,
+            shaders: [
+                ut.compileShader(SHADERS.raytracing.vertex.source, ut.gl.VERTEX_SHADER),
+                ut.compileShader(SHADERS.raytracing.fragment.source, ut.gl.FRAGMENT_SHADER),
+            ],
+        });
 
         state.program = program;
         state.attributes.positions = ut.getAttribLocation(program, 'position');
         state.uniforms.buffer = ut.getUniformBuffer(program, 'Info', new Float32Array(16));
 
-        ut.bindBuffer(SHADERS.vertex.data);
+        ut.bindBuffer(SHADERS.raytracing.vertex.data);
         ut.gl.enableVertexAttribArray(state.attributes.positions);
         ut.gl.vertexAttribPointer(
             state.attributes.positions,
@@ -473,6 +500,7 @@
             2 * 4, // two 4 byte float components per vertex (32 bit float is 4 bytes)
             0 // how many bytes inside the buffer to start from
         );
+
 
         gkm.init(document.body);
 
@@ -530,6 +558,9 @@
         }
     }}
 ></canvas>
+
+<div id='cursor'></div>
+
 <Fps
     bind:onFrame={onFrame} bind:isPause={state.isPause}
 ></Fps>
@@ -538,6 +569,8 @@
     bind:show={state.isMenu}
     bind:pause={state.isPause}
     bind:resolution={state.resolution.z}
+    bind:exposure={state.camera.exposure}
+    bind:autoExposure={state.autoExposure}
     bind:fov={state.camera.d}
     bind:viewDistance={state.camera.distance}
     bind:acceleration={state.acceleration}
@@ -557,5 +590,32 @@
         background: black;
         width: 100vw;
         height: 100vh;
+    }
+
+    #cursor {
+        position: fixed;
+        left: 50vw;
+        top: 50vh;
+        width: 0px;
+        height: 0px;
+    }
+    #cursor::before {
+        content: ' ';
+        display: block;
+        margin-left: -10px;
+        margin-top: -2px;
+        width: 20px;
+        height: 4px;
+        backdrop-filter: invert(100%);
+    }
+    #cursor::after {
+        content: ' ';
+        display: block;
+        margin-left: -2px;
+        margin-top: -12px;
+        width: 4px;
+        height: 20px;
+        /* background: white; */
+        backdrop-filter: invert(100%);
     }
 </style>

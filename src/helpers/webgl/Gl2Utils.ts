@@ -1,3 +1,4 @@
+import { Vector2 } from "../../libs/math/Vector2";
 import { Vector4 } from "../../libs/math/Vector4";
 import type { Texture } from "../../libs/render/Texture";
 import { Helpers } from "../common";
@@ -255,5 +256,27 @@ export class Gl2Utils<TextureName extends string = null> {
         //     const location = this.getUniformLocation(program, `${prefix}[${i}]`);
         //     this.gl.uniform1i(location, i);
         // }
+    }
+
+
+    readPixelsUV(offset: Vector2, sizes: Vector2) {
+        const rsz = new Vector2(this.gl.drawingBufferWidth, this.gl.drawingBufferHeight);
+
+        offset = offset.clone().multiply(rsz).trunc();
+        sizes = sizes.clone().multiply(rsz).trunc();
+        
+        const pixelSize = 4;
+        const pixelsCount = sizes.rectSquare();
+        const data = new Uint8Array(pixelSize * pixelsCount);
+
+        this.gl.readPixels(
+            offset.x, offset.y,
+            sizes.x, sizes.y,
+            this.gl.RGBA,
+            this.gl.UNSIGNED_BYTE,
+            data,
+        );
+
+        return { offset, sizes, pixelsCount, pixelSize, data };
     }
 }

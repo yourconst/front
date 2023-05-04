@@ -11,6 +11,10 @@ export class Range {
         return min <= max;
     }
 
+    static getClosestRangeValue(v: number, min: number, max: number) {
+        return Math.max(min, Math.min(max, v));
+    }
+
     static _getCollisionRange(s1: number, e1: number, s2: number, e2: number) {
         return new Range(
             Math.max(s1, s2),
@@ -64,6 +68,10 @@ export class Range {
 
     isValueInside(v: number) {
         return Range.isValueInside(v, this.min, this.max);
+    }
+
+    getClosestRangeValue(v: number) {
+        return Math.max(this.min, Math.min(this.max, v));
     }
 
     isRangeCollided(r: Range) {

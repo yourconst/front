@@ -73,6 +73,12 @@ export class Vector2 {
         return this;
     }
 
+    minus(v: Vector2) {
+        this.x -= v.x;
+        this.y -= v.y;
+        return this;
+    }
+
     multiply(v: Vector2) {
         this.x *= v.x;
         this.y *= v.y;
@@ -109,5 +115,9 @@ export class Vector2 {
         this.y = x * sin + y * cos;
 
         return this;
+    }
+
+    rectSquare() {
+        return this.x * this.y;
     }
 }

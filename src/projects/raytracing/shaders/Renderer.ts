@@ -94,10 +94,11 @@ export class Renderer {
             f32a, m3x3Offset,
         );
         WebGLStructFiller.Vector2(camera.sizes, f32a, headOffset);
-        f32a[headOffset + 2] = camera.d;
-        f32a[headOffset + 3] = camera.distance;
-        i32a[headOffset + 4] = lights.length;
-        i32a[headOffset + 5] = lights.length + objects.length;
+        f32a[headOffset + 2] = 1 / camera.exposure;
+        f32a[headOffset + 3] = camera.d;
+        f32a[headOffset + 4] = camera.distance;
+        i32a[headOffset + 5] = lights.length;
+        i32a[headOffset + 6] = lights.length + objects.length;
 
         // console.log(f32a);
 

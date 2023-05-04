@@ -9,6 +9,7 @@ import { RigidBody3, type RigidBody3Options } from "../physics/RigidBody3";
 export interface Camera3Options {
     origin?: Vector3;
     angles?: Vector3;
+    exposure?: number;
     d?: number;
     distance?: number;
 }
@@ -39,6 +40,7 @@ export class Camera3 {
 
     origin: Vector3;
     angles: Vector3;
+    exposure: number;
     d: number;
     distance: number;
     
@@ -47,6 +49,7 @@ export class Camera3 {
     constructor(options: Camera3Options) {
         this.origin = options.origin ?? new Vector3();
         this.angles = options.angles ?? new Vector3();
+        this.exposure = options.exposure || 2.2;
         this.d = options.d || 1;
         this.distance = options.distance || Infinity;
     }

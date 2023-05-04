@@ -1,12 +1,15 @@
 <script lang="ts">
     import * as customLaws from './customLaws';
     import CustomLawRange from "./CustomLawRange.svelte";
+    import type { ExposureCalculator } from '../../../libs/render/ExposureCalculator';
 
     export let show = false;
 
     export let pause: boolean;
 
     export let resolution: number;
+    export let exposure: number;
+    export let autoExposure: ExposureCalculator;
     export let fov: number;
     export let viewDistance: number;
     export let acceleration: number;
@@ -49,7 +52,7 @@
     }
 </script>
 
-<div id="menu" style={'right: ' + (show ? '0px' : '-380px')}>
+<div id="menu" style={'right: ' + (show ? '0px' : '-420px')}>
     <table>
         <tr>
             <td>Pause</td>
@@ -58,6 +61,22 @@
         <tr>
             <td>Resolution</td>
             <td><CustomLawRange bind:value={resolution} min={0.1} max={2} step='any' law={customLaws.createPow(1.5)} /></td>
+        </tr>
+        <tr>
+            <td>Exposure</td>
+            <td><CustomLawRange bind:value={exposure} min={autoExposure.range.min} max={autoExposure.range.max} step='any' law={customLaws.createPow(2)} /></td>
+        </tr>
+        <tr>
+            <td>Auto Exposure</td>
+            <td><input type='checkbox' bind:checked={autoExposure.enabled} /></td>
+        </tr>
+        <tr>
+            <td>Auto Exposure Brightness</td>
+            <td><CustomLawRange bind:value={autoExposure.relativeTargetValue} min={0.01} max={1} step='any' law={customLaws.linear} /></td>
+        </tr>
+        <tr>
+            <td>Auto Exposure Speed</td>
+            <td><CustomLawRange bind:value={autoExposure.speed} min={0.01} max={1} step='any' law={customLaws.createPow(2)} /></td>
         </tr>
         <tr>
             <td>FOV</td>
@@ -142,7 +161,7 @@
         position: absolute;
         top: 15vh;
         right: 0px;
-        width: 360px;
+        width: 400px;
         height: 70vh;
 
         padding: 10px;

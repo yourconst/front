@@ -30,6 +30,8 @@ struct Sphere {
 uniform Info {
     mat3x3 rotationMatrix;
     vec2 sizes;
+    // TODO
+    float reverseExposure;
     float d;
     float viewDistance;
     int lightsCount;
@@ -315,13 +317,12 @@ void main() {
 
     vec3 rawColor = getHitColor(ray);
 
-    rawColor = pow(rawColor, vec3(1.0/2.2, 1.0/2.2, 1.0/2.2));
+    rawColor = pow(rawColor, vec3(info.reverseExposure, info.reverseExposure, info.reverseExposure));
 
-    float maxPart = max(rawColor.x, max(rawColor.y, rawColor.z));
-
-    if (maxPart > 1.0) {
-        rawColor /= maxPart;
-    }
+    // float maxPart = max(rawColor.x, max(rawColor.y, rawColor.z));
+    // if (maxPart > 1.0) {
+    //     rawColor /= maxPart;
+    // }
 
     color = vec4(rawColor, 1.0);
 }
