@@ -15,12 +15,22 @@ type Body<Groups, Names> = Body3 & AdditionalProps<Groups, Names>;
 type RigidBody<Groups, Names> = RigidBody3 & AdditionalProps<Groups, Names>;
 
 export class PhysicsEngine3<Groups = null, Names = null> {
-    readonly staticMapper = new Mapper3<Body<Groups, Names>>(AABB3.createByCenterRadius(new Vector3(), 1e10), new Vector3(3e9, 3e9, 3e9));
-    readonly rigidMapper = new Mapper3<RigidBody<Groups, Names>>(AABB3.createByCenterRadius(new Vector3(), 1e10), new Vector3(3e9, 3e9, 3e9));
+    readonly staticMapper: Mapper3<Body<Groups, Names>>;
+    readonly rigidMapper: Mapper3<RigidBody<Groups, Names>>;
     readonly groups = new Map<Groups, Map<Names, Body<Groups, Names>>>();
     readonly names = new Map<Names, Body<Groups, Names>>();
 
     public G = 6.67430e-11;
+
+    // 1e10, 3e9
+    constructor(options: {
+        mapRadius: number;
+        mapCellSize: number;
+    }) {
+        const s = options.mapCellSize;
+        this.staticMapper = new Mapper3(AABB3.createByCenterRadius(new Vector3(), options.mapRadius), new Vector3(s, s, s));
+        this.rigidMapper = new Mapper3(AABB3.createByCenterRadius(new Vector3(), options.mapRadius), new Vector3(s, s, s));
+    }
 
     addBodies(bodies: Iterable<Body<Groups, Names>>) {
         for (const body of bodies) {
@@ -118,6 +128,7 @@ export class PhysicsEngine3<Groups = null, Names = null> {
         this.names.clear();
         this.groups.clear();
         this.rigidMapper.clear();
+        this.staticMapper.clear();
     }
 
     makeSatellite(options: {
@@ -171,15 +182,46 @@ export class PhysicsEngine3<Groups = null, Names = null> {
         // return this;
     }
 
+    readonly rigidStaticCollisions: (Collision & {
+        impulse: Vector3;
+        bodys: Body3;
+        bodyr: RigidBody3;
+    })[] = [];
+
     calcRigidStaticCollision(bodyr: RigidBody3, bodys: Body3, info: Collision) {
         if (!bodyr.onCollide(bodys, info) || !bodys.onCollide(bodyr, info)) {
             return;
         }
 
-        const impulse = bodys.getPointVelocity(info.point)
-            .minus(bodyr.getPointVelocity(info.point));
+        const pvr = bodyr.getPointVelocity(info.point);
+        const pvs = bodys.getPointVelocity(info.point);
 
-        bodyr.applyImpulseToPoint(impulse.clone().multiplyN(1), info.point);
+        const impulse = pvr.clone()
+            .minus(pvs)
+            // .reflectByPlaneNormal(info.normal)
+            .multiplyN(0.2);
+        
+        this.rigidStaticCollisions.push({
+            ...info,
+            impulse,
+            bodys,
+            bodyr,
+        });
+        
+        // console.log({
+        //     pvs,
+        //     pvr,
+        //     normal: info.normal,
+        //     velocity: bodyr.velocity.clone(),
+        //     point: info.point,
+        //     impulse,
+        // });
+
+        bodyr.applyImpulseToPoint(impulse, info.point);
+        // bodyr.applyForceToPoint(
+        //     bodyr.forces.clone().multiplyN(0.25 * bodyr.forces.dot(info.normal)),
+        //     info.point,
+        // );
 
         bodyr.geometry.center.plus(info.normal.clone().multiplyN(info.depth * 0.5));
     }
@@ -193,28 +235,51 @@ export class PhysicsEngine3<Groups = null, Names = null> {
         const b1part = body2.mass / msum;
         const b2part = body1.mass / msum;
 
-        // const pv1 = info.point.clone().minus(body1.geometry.center).cross(body1.angleVelocity).plus(body1.velocity);
-        // const pv2 = info.point.clone().minus(body2.geometry.center).cross(body2.angleVelocity).plus(body2.velocity);
-        // const impulse = pv2.clone().minus(pv1);
-
-        const impulse = body2.getPointVelocity(info.point)
-            .minus(body1.getPointVelocity(info.point));
+        const impulse = body1.getPointVelocity(info.point)
+            .minus(body2.getPointVelocity(info.point))
+            .multiplyN(0.5);
+        
+        this.rigidStaticCollisions.push({
+            ...info,
+            impulse,
+            bodys: body2,
+            bodyr: body1,
+        });
 
         body1.applyImpulseToPoint(impulse.clone().multiplyN(b1part), info.point);
         body2.applyImpulseToPoint(impulse.clone().multiplyN(-b2part), info.point);
 
-        // body1.geometry.center.plus(info.normal.clone().multiplyN(-info.depth * 0.5 * b1part));
-        // body2.geometry.center.plus(info.normal.clone().multiplyN(info.depth * 0.5 * b2part));
+        body1.geometry.center.plus(info.normal.clone().multiplyN(info.depth * 0.5 * b1part));
+        body2.geometry.center.plus(info.normal.clone().multiplyN(-info.depth * 0.5 * b2part));
     }
 
-    calcStep(dt: number) {
+    calcStep(dt: number, options: {
+        gravitation?: 'rigids' | Vector3 | {
+            center: Vector3;
+            acceleration: number;
+        };
+    } = { gravitation: 'rigids' }) {
+        this.rigidStaticCollisions.length = 0;
         const bodies = this.rigidMapper.getAll();
+
+        const gravitationRigids = options.gravitation === 'rigids';
+        const gravitationVector = options.gravitation instanceof Vector3 ? options.gravitation : null;
+        const gravitationCenter = typeof options.gravitation === 'object' && 'center' in options.gravitation ? options.gravitation : null;
 
         for (let i = 0; i < bodies.length; ++i) {
             const body1 = bodies[i];
 
+            if (gravitationRigids)
             for (let j = i + 1; j < bodies.length; ++j) {
                 this.calcPairGravitation(body1, bodies[j]);
+            }
+
+            if (gravitationVector)
+            body1.forces.plus(gravitationVector.clone().multiplyN(body1.mass));
+            
+            if (gravitationCenter) {
+                const dir = gravitationCenter.center.clone().minus(body1.geometry.center).normalize();
+                body1.forces.plus(dir.multiplyN(gravitationCenter.acceleration * body1.mass));
             }
 
             const statics = this.staticMapper.getCollidedWithInfo(body1);
@@ -232,8 +297,8 @@ export class PhysicsEngine3<Groups = null, Names = null> {
                 if (/* body1.checkedSet.has(body2) ||  */body2.checkedSet.has(body1)) {
                     continue;
                 }
-                // body1.checkedSet.add(body2);
-                body2.checkedSet.add(body1);
+                body1.checkedSet.add(body2);
+                // body2.checkedSet.add(body1);
                 
                 this.calcPairCollision(body1, body2, info);
             }
@@ -244,6 +309,13 @@ export class PhysicsEngine3<Groups = null, Names = null> {
 
             body.checkedSet.clear();
             this.rigidMapper.update(body);
+        }
+
+        const statics = this.staticMapper.getAll();
+
+        for (const body of statics) {
+            body.applyChanges(dt);
+            this.staticMapper.update(body);
         }
     }
 }

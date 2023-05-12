@@ -5,9 +5,6 @@ import { Texture } from "../../../libs/render/Texture";
 import { Planet } from "../physics/Planet";
 import * as TEXTURES from '../textures';
 
-Texture.create(TEXTURES['space'], { index: 0 });
-Texture.create(TEXTURES['sun'], { index: 1 });
-
 interface SpaceObject {
     name: TEXTURES.TextureName;
     radius: number;
@@ -65,7 +62,7 @@ for (const star of CONFIG.stars) {
                 texture: Texture.create(TEXTURES[star.name]),
                 center: star.center,
                 radius: star.radius,
-                color: star.color ?? new Vector3(1, 1, 1).multiplyN(4e2),
+                color: star.color ?? new Vector3(1, 1, 1).multiplyN(1e23),
             }),
             mass: star.mass,
             velocity: star.velocity,

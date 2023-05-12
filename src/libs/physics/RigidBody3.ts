@@ -1,4 +1,5 @@
 import type { Collision, Geometry3 } from "../geometry/Geometry3";
+import { Matrix3x3 } from "../math/Matrix3x3";
 import { Vector3 } from "../math/Vector3";
 import { Body3, type Body3Options } from "./Body3";
 
@@ -75,64 +76,60 @@ export class RigidBody3 extends Body3 {
 
         this.angleAcceleration.plus(this.angleForces.multiplyN(1 / this.mass));
         this.angleForces.setN(0, 0, 0);
-        this.geometry.angles.plus(
-            this.angleVelocity.clone().multiplyN(dt).plus(
-                this.angleAcceleration.clone().multiplyN(dt * dt / 2),
-            ),
+
+        const da = this.angleVelocity.clone().multiplyN(dt).plus(
+            this.angleAcceleration.clone().multiplyN(dt * dt / 2),
         );
+        // this.geometry.angles.plus(
+        //     da/* .rotateReverseZYX(this.geometry.angles) */,
+        // ).normalizeAngles();
+        this.geometry.rotation
+            .rotateRelativeX(da.x).rotateRelativeY(da.y).rotateRelativeZ(da.z);
+            // ['m'].multiply3x3Left(Matrix3x3.createRotationFromAnglesXYZ(da));
+
         this.angleVelocity.plus(this.angleAcceleration.clone().multiplyN(dt));
         this.angleAcceleration.setN(0, 0, 0);
     }
 
+    // applyForceToPoint(force: Vector3, point: Vector3) {
+    //     const rv = point.clone().minus(this.geometry.center);
+    //     const rvl = rv.length() || 1;
+    //     const rawCos = rv.normalize().dot(force.clone().normalize());
+    //     const cos = Math.sign(rawCos) * Math.min(1, Math.abs(rawCos));
+    //     const sin = Math.sqrt(1 - cos * cos);
+
+    //     // TODO: check. (why sin / cos replaced)
+    //     this.angleForces.plus(force.cross(rv).multiplyN(1.0 * cos / rvl));
+    //     this.forces.plus(force.clone().multiplyN(sin));
+
+    //     return this;
+    // }
+
     applyForceToPoint(force: Vector3, point: Vector3) {
         const rv = point.clone().minus(this.geometry.center);
-        const rvl = rv.length() || 1;
-        const rawCos = rv.normalize().dot(force.clone().normalize());
-        const cos = Math.sign(rawCos) * Math.min(1, Math.abs(rawCos));
-        const sin = Math.sqrt(1 - cos * cos);
+        const cos = -rv.normalize().dot(force.clone().normalize());
 
-        // TODO: check. (why sin / cos replaced)
-        this.angleForces.plus(force.cross(rv).multiplyN(1.0 * cos / rvl));
-        this.forces.plus(force.clone().multiplyN(sin));
+        this.angleForces.plus(force.cross(rv));
+        this.forces.plus(force.clone().multiplyN(cos));
 
         return this;
     }
 
     applyImpulseToPoint(impulse: Vector3, point: Vector3) {
         const rv = point.clone().minus(this.geometry.center);
-        const rvl = rv.length() || 1;
-        const rawCos = rv.normalize().dot(impulse.clone().normalize());
-        const cos = /* Math.sign(rawCos) *  */Math.min(1, Math.abs(rawCos));
-        const sin = Math.sqrt(1 - cos * cos);
+        // const rvl = rv.length();
 
-        // TODO: check. (why sin / cos replaced)
-        this.angleVelocity.plus(impulse.cross(rv).multiplyN(1.0 * cos / rvl));
-        this.velocity.plus(impulse.clone().multiplyN(sin));
+        // if (rvl === 0) {
+        //     this.velocity.plus(impulse);
+        //     return this;
+        // }
+
+        const cos = -rv.normalize().dot(impulse.clone().normalize());
+        // const cos = - Math.sign(rawCos) * Math.min(1, Math.abs(rawCos));
+
+        this.angleVelocity.plus(impulse.cross(rv));
+        this.velocity.plus(impulse.clone().multiplyN(cos));
 
         return this;
     }
 }
-
-/* 
-Otiginal:
-https://stackoverflow.com/questions/9037174/glsl-rotation-with-a-rotation-vector
-
-vec3 temp = cross(q.xyz, v) + q.w * v;
-vec3 rotated = v + 2.0*cross(q.xyz, temp);
-
-js:
-const v = new Vector2(1, 0, 0);
-const n = new Vector2(0, 1, 0);
-const angle = Math.PI / 2;
-
-const cos = Math.cos(angle / 2);
-const sin = Math.sin(angle / 2);
-
-const q = n.clone().multiplyN(sin);
-const qw = cos;
-
-const temp = q.clone().cross(v).plus(v.clone().multiplyN(qw));
-const result = q.clone().cross(temp).multiplyN(2).plus(v);
-
-result;
-*/

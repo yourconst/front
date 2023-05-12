@@ -89,8 +89,8 @@ export class AABB3 {
     }
 
     setByCenterRadius(center: Vector3, r: number) {
-        this.max.setN(center.x - r, center.y - r, center.z - r);
-        this.min.setN(center.x + r, center.y + r, center.z + r);
+        this.min.setN(center.x - r, center.y - r, center.z - r);
+        this.max.setN(center.x + r, center.y + r, center.z + r);
         return this;
     }
 
@@ -131,3 +131,5 @@ export class AABB3 {
         );
     }
 }
+
+globalThis['AABB3'] = AABB3;

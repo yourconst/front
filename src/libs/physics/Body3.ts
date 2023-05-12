@@ -1,4 +1,5 @@
 import type { Collision, Geometry3 } from "../geometry/Geometry3";
+import { Matrix3x3 } from "../math/Matrix3x3";
 import { Vector3 } from "../math/Vector3";
 
 export interface Body3Options {
@@ -36,10 +37,22 @@ export class Body3 {
     }
 
     getPointAngularVelocity(point: Vector3) {
-        return point.clone().minus(this.geometry.center).cross(this.angleVelocity);
+        return this.angleVelocity.cross(point.clone().minus(this.geometry.center));
     }
 
     getPointVelocity(point: Vector3) {
         return this.getPointAngularVelocity(point).plus(this.velocity);
+        // return this.velocity.clone();
+    }
+
+    applyChanges(dt: number) {
+        this.geometry.center.plus(
+            this.velocity.clone().multiplyN(dt),
+        );
+
+        const da = this.angleVelocity.clone().multiplyN(dt);
+        this.geometry.rotation
+            .rotateRelativeX(da.x).rotateRelativeY(da.y).rotateRelativeZ(da.z);
+            // ['m'].multiply3x3Left(Matrix3x3.createRotationFromAnglesXYZ(da));
     }
 }

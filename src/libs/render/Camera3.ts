@@ -1,10 +1,12 @@
 import type { Geometry3 } from "../geometry/Geometry3";
 import { Ray3 } from "../math/Ray3";
 import { Sphere } from "../geometry/Sphere";
-import { Matrix3x3 } from "../math/Matrix3x3";
 import { Vector2 } from "../math/Vector2";
 import { Vector3 } from "../math/Vector3";
 import { RigidBody3, type RigidBody3Options } from "../physics/RigidBody3";
+import { Plane3 } from "../math/Plane3";
+import type { IRotation3 } from "../math/rotattion/IRotation3";
+import { Rotation3 } from "../math/rotattion/Rotation3";
 
 export interface Camera3Options {
     origin?: Vector3;
@@ -12,6 +14,7 @@ export interface Camera3Options {
     exposure?: number;
     d?: number;
     distance?: number;
+    ambient?: number;
 }
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
@@ -29,7 +32,7 @@ export class Camera3 {
         bodyOptions.geometry ??= new Sphere({
             center: camera.origin,
             radius: 0.3,
-            angles: camera.angles,
+            rotation: camera.rotation,
         });
 
         return {
@@ -39,19 +42,26 @@ export class Camera3 {
     }
 
     origin: Vector3;
-    angles: Vector3;
+    rotation: IRotation3;
+    // angles: Vector3;
     exposure: number;
     d: number;
     distance: number;
+    ambient: number;
     
     sizes = new Vector2(1920, 1080);
+    // rotation: Matrix3x3;
 
     constructor(options: Camera3Options) {
         this.origin = options.origin ?? new Vector3();
-        this.angles = options.angles ?? new Vector3();
+        // this.rotation = CameraRotation.createByAngles(options.angles);
+        this.rotation = Rotation3.Quaternion.createXYZ(options.angles);
         this.exposure = options.exposure || 2.2;
         this.d = options.d || 1;
         this.distance = options.distance || Infinity;
+        this.ambient = options.ambient || 0.1;
+
+        // this.rotation = Matrix3x3.createRotationFromAnglesXYZ(this.angles);
     }
 
     getHalfSizes() {
@@ -71,32 +81,61 @@ export class Camera3 {
     }
 
     lookAt(point: Vector3) {
-        const angles = point.clone().minus(this.origin).normalize().angles();
-
-        this.angles.x = angles.y - Math.PI / 2;
-        this.angles.y = angles.x - Math.PI / 2;
+        // const angles = point.clone().minus(this.origin).normalize().anglesZ();
+        // this.angles.setN(angles.x, angles.y);
+    
+        // this.rotation.direction.set(this.origin.getDirectionTo(point));
 
         return this;
     }
 
     getDirection() {
-        const angles = this.angles.clone();
+        // const angles = this.angles.clone();
         // angles.x *= -1;
-        return new Vector3(0, 0, 1).rotateZXY(angles);
+        // return new Vector3(0, 0, 1).rotateZXY(angles);
+        return this.rotation.forwardDirection();
     }
+    // getDirection() {
+    //     return this.rotation.multiplyVector3Column(new Vector3(0, 0, 1));
+    // }
 
     getCenterRay() {
         return new Ray3(this.origin.clone(), this.getDirection());
     }
 
+    getScreenPlane() {
+        const r = this.getCenterRay();
+        // return new Plane3(r.getPointByDistance(this.d), r.direction, this.angles.z);
+        return new Plane3(r.getPointByDistance(this.d), r.direction, this.rotation.clone());
+    }
+
     getRotationMatrix3x3() {
-        const angles = this.angles.clone();
-        angles.x *= -1;
-        return Matrix3x3.createRotationFromAnglesZXY(angles);
+        // const angles = this.angles.clone();
+        // angles.x *= -1;
+        // return Matrix3x3.createRotationFromAnglesZXY(angles);
+        return this.rotation.matrix();
+    }
+    // getRotationMatrix3x3() {
+    //     return this.rotation;
+    // }
+
+    getAbsoluteDistancedSize(distance: number, relativeSize: number) {
+        return relativeSize * this.d / distance;
+    }
+
+    getRelativeDistancedSize(distance: number, absoluteSize: number) {
+        return absoluteSize * this.d / distance;
+    }
+
+    isGeometryVisible(g: Geometry3) {
+        return this.getRelativeDistancedSize(
+            g.center.distanceTo(this.origin), g.getRadius()
+        ) * this.minSize > 0.49;
     }
 
     getInversionMultiplier() {
-        return (Math.abs(this.angles.x) + Math.PI / 2) % (2 * Math.PI) > Math.PI ? -1 : 1;
+        // return (Math.abs(this.angles.x) + Math.PI / 2) % (2 * Math.PI) > Math.PI ? -1 : 1;
+        return 1;
     }
 
     pyramidMultiplier = 1;
@@ -107,10 +146,15 @@ export class Camera3 {
 
         return {
             centerRay: this.getCenterRay(),
+            // cornerDirs: <[Vector3, Vector3, Vector3]> [
+            //     bv.clone().multiplyX(-1).rotateZXY(this.angles).normalize(),
+            //     bv.clone().rotateZXY(this.angles).normalize(),
+            //     bv.clone().multiplyY(-1).rotateZXY(this.angles).normalize(),
+            // ],
             cornerDirs: <[Vector3, Vector3, Vector3]> [
-                bv.clone().multiplyX(-1).rotateZXY(this.angles).normalize(),
-                bv.clone().rotateZXY(this.angles).normalize(),
-                bv.clone().multiplyY(-1).rotateZXY(this.angles).normalize(),
+                this.rotation.getAbsoluteVector(bv.clone().multiplyX(-1)).normalize(),
+                this.rotation.getAbsoluteVector(bv.clone()).normalize(),
+                this.rotation.getAbsoluteVector(bv.clone().multiplyY(-1)).normalize(),
             ],
         };
     }

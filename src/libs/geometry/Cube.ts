@@ -1,25 +1,25 @@
 import { AABB3 } from "../math/AABB3";
-import { Vector2 } from "../math/Vector2";
 import { Vector3 } from "../math/Vector3";
-import { Geometry3 } from "./Geometry3";
+import { Geometry3, type Geometry3Options } from "./Geometry3";
 import type { Ray3 } from "../math/Ray3";
 
-export interface CubeOptions {
-    center: Vector3;
-    radius: number;
-    angles?: Vector3;
+export interface CubeOptions extends Geometry3Options {
+    sizes?: Vector3;
 }
 
 export class Cube extends Geometry3 {
+    sizes: Vector3;
+
     constructor(options: CubeOptions) {
-        super(options.center, options.radius, options.angles);
+        super(options);
+
+        this.sizes = options.sizes ?? new Vector3(options.radius, options.radius, options.radius);;
     }
 
     _getCloneConfig() {
         return {
-            center: this.center.clone(),
-            radius: this.radius,
-            angles: this.angles.clone(),
+            ...super._getCloneConfig(),
+            sizes: this.sizes.clone(),
         };
     }
 
@@ -28,16 +28,16 @@ export class Cube extends Geometry3 {
     }
 
     calcAABB() {
-        const r = this.radius;
+        const s = this.sizes;
         const ps = [
-            this.center.clone().plusN(-r, -r, -r).rotateXYZ(this.angles),
-            this.center.clone().plusN(-r, -r, r).rotateXYZ(this.angles),
-            this.center.clone().plusN(r, -r, -r).rotateXYZ(this.angles),
-            this.center.clone().plusN(r, -r, r).rotateXYZ(this.angles),
-            this.center.clone().plusN(-r, r, -r).rotateXYZ(this.angles),
-            this.center.clone().plusN(-r, r, r).rotateXYZ(this.angles),
-            this.center.clone().plusN(r, r, -r).rotateXYZ(this.angles),
-            this.center.clone().plusN(r, r, r).rotateXYZ(this.angles),
+            this.getAbsolutePoint(new Vector3(-s.x, -s.y, -s.z)),
+            this.getAbsolutePoint(new Vector3(-s.x, -s.y, s.z)),
+            this.getAbsolutePoint(new Vector3( s.x, -s.y, -s.z)),
+            this.getAbsolutePoint(new Vector3( s.x, -s.y, s.z)),
+            this.getAbsolutePoint(new Vector3(-s.x,  s.y, -s.z)),
+            this.getAbsolutePoint(new Vector3(-s.x,  s.y, s.z)),
+            this.getAbsolutePoint(new Vector3( s.x,  s.y, -s.z)),
+            this.getAbsolutePoint(new Vector3( s.x,  s.y, s.z)),
         ];
 
         if (!this.aabb) {
@@ -47,53 +47,56 @@ export class Cube extends Geometry3 {
     }
 
     calcVolume() {
-        return (this.radius * 2) ** 3;
+        return this.sizes.volumeRect() * 8;
+    }
+
+    calcRadius() {
+        return this.sizes.maxComponent();
     }
 
     getClosestPointToPoint(point: Vector3) {
-        const t = point.clone().minus(this.center)
-            .rotateZYX(this.angles.clone().multiplyN(-1));
+        const t = this.getRelativePoint(point);
         const at = t.clone().abs();
 
         if (
-            at.x <= this.radius &&
-            at.y <= this.radius &&
-            at.z <= this.radius
+            at.x <= this.sizes.x &&
+            at.y <= this.sizes.y &&
+            at.z <= this.sizes.z
         ) {
             return point.clone();
         }
 
-        at.minSetN(this.radius, this.radius, this.radius);
-        t.sign().setXIfNull();
+        at.minSet(this.sizes);
+        t.sign()/* .setXIfNull() */;
         
-        if (at.y < at.x && at.z < at.x) {
-            at.x = this.radius;
-        } else
-        if (at.z < at.y) {
-            at.y = this.radius;
-        } else {
-            at.z = this.radius;
-        }
+        // if (at.y < at.x && at.z < at.x) {
+        //     at.x = this.sizes.x;
+        // } else
+        // if (at.z < at.y) {
+        //     at.y = this.sizes.y;
+        // } else {
+        //     at.z = this.sizes.z;
+        // }
 
-        return at.multiply(t).rotateXYZ(this.angles).plus(this.center);
+        return this.getAbsolutePoint(at.multiply(t));
     }
 
     getClosestSurfacePointToPoint(point: Vector3) {
-        const t = point.clone().minus(this.center)
-            .rotateZYX(this.angles.clone().multiplyN(-1));
-        const at = t.clone().abs().minSetN(this.radius, this.radius, this.radius);
+        const t = this.getRelativePoint(point);
+        const at = t.clone().abs().minSet(this.sizes);
         t.sign().setXIfNull();
+        const dt = this.sizes.clone().minus(at).multiplyN(-1);
         
-        if (at.y < at.x && at.z < at.x) {
-            at.x = this.radius;
+        if (dt.y < dt.x && dt.z < dt.x) {
+            at.x = this.sizes.x;
         } else
-        if (at.z < at.y) {
-            at.y = this.radius;
+        if (dt.z < dt.y) {
+            at.y = this.sizes.y;
         } else {
-            at.z = this.radius;
+            at.z = this.sizes.z;
         }
 
-        return at.multiply(t).rotateXYZ(this.angles).plus(this.center);
+        return this.getAbsolutePoint(at.multiply(t));
         
     }
 
@@ -103,11 +106,9 @@ export class Cube extends Geometry3 {
         // const direction = ray.direction.clone().rotateZYX(rAngles);
 
         const rrr = this.getRelativeRay(ray);
-        
-        const rv = new Vector3(this.radius, this.radius, this.radius);
 
-        const tMin = rv.clone().multiplyN(-1).minus(rrr.origin).divide(rrr.direction);
-        const tMax = rv.clone().multiplyN(+1).minus(rrr.origin).divide(rrr.direction);
+        const tMin = this.sizes.clone().multiplyN(-1).minus(rrr.origin).divide(rrr.direction);
+        const tMax = this.sizes.clone().multiplyN(+1).minus(rrr.origin).divide(rrr.direction);
 
         const t1 = tMin.clone().minSet(tMax);
         const t2 = tMin.clone().maxSet(tMax);
@@ -123,17 +124,21 @@ export class Cube extends Geometry3 {
     }
 
     getNormalToPoint(p: Vector3) {
-        const hitPoint = this.getRelativePoint(p);
-        const epsilon = 0.0001;
+        const rp = this.getRelativePoint(p);
+        // const epsilon = this.radius * 0.1;
+        const epsilon = 0.01;
 
         let result: Vector3;
+        // console.log(this.radius, rp);
     
-        if(hitPoint.x < /* this.center.x */ - this.radius + epsilon) result = new Vector3(-1.0, 0.0, 0.0);
-        else if(hitPoint.x > /* this.center.x */ + this.radius - epsilon) result = new Vector3(1.0, 0.0, 0.0);
-        else if(hitPoint.y < /* this.center.y */ - this.radius + epsilon) result = new Vector3(0.0, -1.0, 0.0);
-        else if(hitPoint.y > /* this.center.y */ + this.radius - epsilon) result = new Vector3(0.0, 1.0, 0.0);
-        else if(hitPoint.z < /* this.center.z */ - this.radius + epsilon) result = new Vector3(0.0, 0.0, -1.0);
+        if(rp.x < /* this.center.x */ - this.sizes.x + epsilon) result = new Vector3(-1.0, 0.0, 0.0);
+        else if(rp.x > /* this.center.x */ + this.sizes.x - epsilon) result = new Vector3(1.0, 0.0, 0.0);
+        else if(rp.y < /* this.center.y */ - this.sizes.y + epsilon) result = new Vector3(0.0, -1.0, 0.0);
+        else if(rp.y > /* this.center.y */ + this.sizes.y - epsilon) result = new Vector3(0.0, 1.0, 0.0);
+        else if(rp.z < /* this.center.z */ - this.sizes.z + epsilon) result = new Vector3(0.0, 0.0, -1.0);
         else result = new Vector3(0.0, 0.0, 1.0);
+
+        // console.log(result);
 
         return this.getAbsoluteDirection(result);
     }

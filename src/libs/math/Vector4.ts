@@ -121,4 +121,12 @@ export class Vector4 {
 
         return this;
     }
+
+    toRGB(multiplier = 255) {
+        return `rgb(${multiplier * this.x}, ${multiplier * this.y}, ${multiplier * this.z})`;
+    }
+
+    toRGBA(multiplier = 255) {
+        return `rgb(${multiplier * this.x}, ${multiplier * this.y}, ${multiplier * this.z}, ${this.w})`;
+    }
 }

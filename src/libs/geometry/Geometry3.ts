@@ -1,6 +1,9 @@
 import type { AABB3 } from "../math/AABB3";
-import { Vector3 } from "../math/Vector3";
+import type { Vector3 } from "../math/Vector3";
 import { Ray3 } from "../math/Ray3";
+import { Matrix3x3 } from "../math/Matrix3x3";
+import type { IRotation3 } from "../math/rotattion/IRotation3";
+import { Rotation3 } from "../math/rotattion/Rotation3";
 
 // export interface Geometry3Options {
 //     center: Vector3;
@@ -15,14 +18,38 @@ export interface Collision {
     normal?: Vector3;
 }
 
+export interface Geometry3Options {
+    center: Vector3;
+    radius?: number;
+    volume?: number;
+    aabb?: AABB3;
+    rotation?: IRotation3;
+}
+
 export abstract class Geometry3 {
-    constructor(
-        public center = new Vector3(),
-        public radius?: number,
-        public angles = new Vector3(),
-        public aabb?: AABB3,
-        public volume?: number,
-    ) { }
+    center: Vector3;
+    radius?: number;
+    volume?: number;
+    aabb?: AABB3;
+    rotation: IRotation3;
+
+    constructor(options: Geometry3Options) {
+        this.center = options.center;
+        this.radius = options.radius;
+        this.volume = options.volume;
+        this.aabb = options.aabb;
+        this.rotation = options.rotation ?? Rotation3.Quaternion.createNXYZ(0, 0, 0);
+    }
+
+    _getCloneConfig(): Geometry3Options {
+        return {
+            center: this.center.clone(),
+            radius: this.radius,
+            volume: this.volume,
+            aabb: this.aabb,
+            rotation: this.rotation.clone(),
+        };
+    }
 
     abstract clone(): Geometry3;
 
@@ -84,20 +111,32 @@ export abstract class Geometry3 {
     }
 
     getCollision(geometry: Geometry3): Collision {
-        const op = geometry.getClosestSurfacePointToPoint(this.center);
-        const tp = this.getClosestSurfacePointToPoint(op);
+        let mult = 1;
+        let max: Geometry3 = this;
+        let min: Geometry3 = geometry;
 
-        if (this.center.distance2To(tp) < this.center.distance2To(op)) {
+        if (max['sizes'] || max.getVolume() < min.getVolume()) {
+            mult = -1;
+            max = geometry;
+            min = this;
+        }
+
+        const op = min.getClosestSurfacePointToPoint(max.center);
+        const tp = max.getClosestSurfacePointToPoint(op);
+
+        if (max.center.distance2To(tp) < max.center.distance2To(op)) {
             return {
                 isCollided: false,
             };
         }
 
+        const point = op.clone().plus(tp).multiplyN(0.5);
         return {
             isCollided: true,
             depth: op.distanceTo(tp),
-            point: op.clone().plus(tp).multiplyN(0.5),
-            normal: op.clone().minus(tp).normalize(),
+            point,
+            // normal: op.clone().minus(tp).normalize().multiplyN(mult),
+            normal: max.getNormalToPoint(tp).multiplyN(-mult),
         };
 
         // const info = this.getCollisionPointInfo(geometry);
@@ -150,29 +189,32 @@ export abstract class Geometry3 {
 
 
 
-
-    getReverseAngles() {
-        return this.angles.clone().multiplyN(-1);
-    }
-
+    // TODO: fix
     getRelativeDirection(ad: Vector3) {
-        return ad.clone().rotateReverseZYX(this.angles);
+        // return ad.clone().rotateReverseZYX(this.angles);
+        return this.rotation.getAbsoluteVector(ad);
     }
 
     getRelativePoint(ap: Vector3) {
-        return ap.clone()
-            .minus(this.center)
-            .rotateReverseZYX(this.angles);
+        // return ap.clone()
+        //     .minus(this.center)
+        //     .rotateReverseZYX(this.angles);
+        return this.getRelativeDirection(
+            ap.clone().minus(this.center),
+        );
     }
 
+    // TODO: fix
     getAbsoluteDirection(rd: Vector3) {
-        return rd.clone().rotateXYZ(this.angles);
+        // return rd.clone().rotateXYZ(this.angles);
+        return this.rotation.getRelativeVector(rd);
     }
 
     getAbsolutePoint(rp: Vector3) {
-        return rp.clone()
-            .rotateXYZ(this.angles)
-            .plus(this.center);
+        // return rp.clone()
+        //     .rotateXYZ(this.angles)
+        //     .plus(this.center);
+        return this.getAbsoluteDirection(rp).plus(this.center);
     }
 
     getRelativeRay(ar: Ray3) {

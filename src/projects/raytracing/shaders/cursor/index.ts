@@ -1,6 +1,6 @@
-import { Vector2 } from "../../../libs/math/Vector2";
-import vertexSource from './standard.vert?raw';
-import fragmentSource from './cursor.frag?raw';
+import { Vector2 } from "../../../../libs/math/Vector2";
+import vertexSource from '../standard.vert?raw';
+import fragmentSource from './index.frag?raw';
 
 const sz = 0.1;
 const szw = sz / 2;

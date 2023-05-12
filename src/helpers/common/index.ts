@@ -3,6 +3,7 @@ class PromiseManaged<T = void> {
     private readonly _reject: (err?: any) => void;
     readonly promise: Promise<T>;
     private _isResolved = false;
+    _isStarted = false;
 
     constructor() {
         this.promise = new Promise<T>((resolve, reject) => {
@@ -209,6 +210,10 @@ export class Helpers {
     static readonly PromiseManagedTimeouted = PromiseManagedTimeouted;
     static readonly SleeperChanging = SleeperChanging;
     static readonly NumberUnitFormatter = NumberUnitFormatter;
+
+    static randElement<T>(array: T[]) {
+        return array[Helpers.randInt(0, array.length)];
+    }
 
     static rand(max: number, min = 0) {
         return min + Math.random() * (max - min);

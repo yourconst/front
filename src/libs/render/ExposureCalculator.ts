@@ -33,7 +33,7 @@ export class ExposureCalculator {
         this.relativeTargetValue = Range.getClosestRangeValue(options.relativeTargetValue ?? 0.25, 0, 1);
         this.arrayType = options.arrayType ?? 'avg';
         this.pixelType = options.pixelType ?? 'max';
-        this.range = options.range ?? new Range(0.1, 10);
+        this.range = options.range ?? new Range(0.001, 100);
         this.speed = Range.getClosestRangeValue(options.speed ?? 0.5, 0.01, 1);
     }
 

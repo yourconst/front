@@ -6,52 +6,61 @@ export type RealRawTextureSource = HTMLImageElement | HTMLCanvasElement | Offscr
 
 export type RawTextureSource = string | RealRawTextureSource;
 
+function createCanvasWithData(options: {
+    data: ArrayLike<number>;
+    width?: number;
+    height?: number;
+    multiplier?: number;
+}) {
+    const sqrt = Math.sqrt(options.data.length >> 2) >> 0;
+
+    options.width ??= sqrt;
+    options.height ??= sqrt;
+    options.multiplier ??= 1;
+    const canvas = Helpers.createOffscreenCanvas(options.width, options.height);
+    const context = <CanvasRenderingContext2D> canvas.getContext('2d');
+    const id = context.getImageData(0, 0, options.width, options.height);
+
+    for (let i = 0; i < (options.width * options.height) << 2; ++i) {
+        id.data[i] = options.data[i] * options.multiplier;
+    }
+
+    context.putImageData(id, 0, 0);
+
+    return { canvas, context };
+}
+
 export interface TextureOptions {
-    baseColor?: Vector4;
+    base?: {
+        data: ArrayLike<number>;
+        width?: number;
+        height?: number;
+    };
     maxWidth?: number;
     maxHeight?: number;
-    index?: number;
 }
 
 export class Texture {
     private static readonly cache = new Map<RawTextureSource, Texture>();
-    private static readonly indexesCache: Texture[] = [];
-
-    private static getNextIndex() {
-        for (let i = 0; i < this.indexesCache.length; ++i) {
-            if (!this.indexesCache[i]) {
-                return i;
-            }
-        }
-
-        return this.indexesCache.length;
-    }
-
-    private static isIndexFree(index: number) {
-        return !this.indexesCache[index];
-    }
 
     static clear() {
         this.cache.clear();
-        this.indexesCache.length = 0;
     }
 
     private static broadcastedSimpleTexure?: Texture;
     static broadcastSimpleTexture() {
         const sz = 4;
-        const canvas = Helpers.createOffscreenCanvas(sz, sz);
-        const context = <CanvasRenderingContext2D> canvas.getContext('2d');
-        const id = context.getImageData(0, 0, sz, sz);
+        const data = new Uint8Array(sz * sz);
 
         for (let i = 0; i < sz * sz; ++i) {
             const other = (i % 2) ^ ((i / sz) >> 0) % 2;
-            id.data[4 * i + 0] = other ? 255 : 0;
-            id.data[4 * i + 1] = other ? 0 : 255;
-            id.data[4 * i + 2] = 127;
-            id.data[4 * i + 3] = 255;
+            data[4 * i + 0] = other ? 255 : 0;
+            data[4 * i + 1] = other ? 0 : 255;
+            data[4 * i + 2] = 127;
+            data[4 * i + 3] = 255;
         }
 
-        context.putImageData(id, 0, 0);
+        const { canvas } = createCanvasWithData({ data });
 
         this.broadcastedSimpleTexure = this.create(canvas);
         return this;
@@ -65,23 +74,8 @@ export class Texture {
         let texture = this.cache.get(rawSource);
 
         if (!texture) {
-            if (typeof options.index === 'number') {
-                options.index >>= 0;
-                if (options.index < 0 || 31 < options.index) {
-                    console.log(options);
-                    throw new Error();
-                }
-                if (!this.isIndexFree(options.index)) {
-                    console.log(options);
-                    throw new Error();
-                }
-            } else {
-                options.index = this.getNextIndex();
-            }
-
             texture = new Texture(rawSource, options);
             this.cache.set(rawSource, texture);
-            this.indexesCache[texture.index] = texture;
         }
 
         return texture;
@@ -91,12 +85,15 @@ export class Texture {
         return [...this.cache.values()];
     }
 
-    baseColor: Vector4;
-    canvas?: OffscreenCanvas | HTMLCanvasElement;
-    context2d?: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
-    readonly index: number;
+    canvas: OffscreenCanvas | HTMLCanvasElement;
+    context2d: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
+    private _loadingPromise = new Helpers.PromiseManaged<Texture>();
+    maxWidth?: number;
+    maxHeight?: number;
+    
+    updatedAt = performance.now();
 
-    private constructor(public readonly rawSource: RawTextureSource, public options: TextureOptions = {}) {
+    private constructor(public readonly rawSource: RawTextureSource, options: TextureOptions = {}) {
         if (!(
             typeof this.rawSource === 'string' ||
             this.rawSource instanceof HTMLImageElement ||
@@ -106,30 +103,51 @@ export class Texture {
             throw new Error('Bad texture source', { cause: this.rawSource });
         }
 
-        this.baseColor = this.options.baseColor || new Vector4(0.5, 0.5, 0.5, 1.0);
-        this.index = options.index ?? -1;
+        this.maxWidth = options.maxWidth;
+        this.maxHeight = options.maxHeight;
+        
+        const base = createCanvasWithData({
+            data: options.base?.data || [0.5, 0.5, 0.5, 1.0],
+            width: options.base?.width,
+            height: options.base?.height,
+            multiplier: 255,
+        });
+
+        this.canvas = base.canvas;
+        this.context2d = base.context;
     }
 
     get loaded() {
-        return !!this.canvas;
+        return !this._loadingPromise;
+    }
+
+    get loading() {
+        return !!this._loadingPromise?._isStarted;
     }
 
     get width() {
-        return this.canvas?.width || 1;
+        return this.canvas.width;
     }
 
     get height() {
-        return this.canvas?.height || 1;
+        return this.canvas.height;
     }
 
     isSizesPow2() {
         return Helpers.isPow2(this.width) && Helpers.isPow2(this.height);
     }
     
+    // TODO: rejecting
     async load() {
         if (this.loaded) {
             return this;
         }
+
+        if (this.loading) {
+            return this._loadingPromise.promise;
+        }
+
+        this._loadingPromise._isStarted = true;
 
         let realRawSource: RealRawTextureSource;
         let width: number;
@@ -164,13 +182,13 @@ export class Texture {
             height = realRawSource.height;
         }
 
-        if ((this.options.maxWidth || this.options.maxHeight) && (
-            width > this.options.maxWidth ||
-            height > this.options.maxHeight
+        if ((this.maxWidth || this.maxHeight) && (
+            width > this.maxWidth ||
+            height > this.maxHeight
         )) {
             const factor = Math.max(
-                width / (this.options.maxWidth || width),
-                height / (this.options.maxHeight || height),
+                width / (this.maxWidth || width),
+                height / (this.maxHeight || height),
             );
 
             width = (width / factor) >> 0;
@@ -180,8 +198,12 @@ export class Texture {
         this.canvas = Helpers.createOffscreenCanvas(width, height);
         this.context2d = <any> this.canvas.getContext('2d');
         this.context2d.drawImage(realRawSource, 0, 0, width, height);
+    
+        this.updatedAt = performance.now();
 
-        return this;
+        const { _loadingPromise } = this;
+        this._loadingPromise = null;
+        return _loadingPromise.promise;
     }
 
     getPixelByUV(uv: Vector2) {

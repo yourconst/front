@@ -1,26 +1,16 @@
 import { AABB3 } from "../math/AABB3";
 import { Vector2 } from "../math/Vector2";
 import type { Vector3 } from "../math/Vector3";
-import { Geometry3 } from "./Geometry3";
+import { Geometry3, type Geometry3Options } from "./Geometry3";
 import type { Ray3 } from "../math/Ray3";
 
-export interface SphereOptions {
-    center: Vector3;
-    radius: number;
-    angles?: Vector3;
+export interface SphereOptions extends Geometry3Options {
+    
 }
 
 export class Sphere extends Geometry3 {
     constructor(options: SphereOptions) {
-        super(options.center, options.radius, options.angles);
-    }
-
-    _getCloneConfig() {
-        return {
-            center: this.center.clone(),
-            radius: this.radius,
-            angles: this.angles.clone(),
-        };
+        super(options);
     }
 
     clone() {

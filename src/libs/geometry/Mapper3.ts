@@ -31,6 +31,8 @@ export class Mapper3<O extends MappedObject3> {
             cell.clear();
         }
 
+        this.all.clear();
+
         return this;
     }
 

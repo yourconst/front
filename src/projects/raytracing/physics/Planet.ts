@@ -386,7 +386,7 @@ export class Planet extends RigidBody3 {
                 center: this.geometry.getAbsolutePoint(block.relativePosition),
                 color: block.color.clone(),
                 radius: 0.5,
-                angles: this.geometry.angles,
+                rotation: this.geometry.rotation,
             }),
             parent: this,
             info: block,

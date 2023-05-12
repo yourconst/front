@@ -16,6 +16,10 @@ export class Vector3 {
     clone() {
         return new Vector3(this.x, this.y, this.z);
     }
+
+    cloneXY() {
+        return new Vector2(this.x, this.y);
+    }
     
     setXIfNull(x = 1) {
         if (this.x === 0 && this.y === 0 && this.z === 0) {
@@ -38,6 +42,14 @@ export class Vector3 {
             y: Vector2.fromAngle(this.y),
             z: Vector2.fromAngle(this.z),
         };
+    }
+
+    maxComponent() {
+        return Math.max(this.x, this.y, this.z);
+    }
+
+    minComponent() {
+        return Math.min(this.x, this.y, this.z);
     }
 
     maxSet(v: Vector3) {
@@ -142,6 +154,10 @@ export class Vector3 {
         this.z = Math.sign(this.z);
 
         return this;
+    }
+
+    volumeRect() {
+        return this.x * this.y * this.z;
     }
 
     length2() {
@@ -262,8 +278,8 @@ export class Vector3 {
         const cosy = Math.cos(ay), siny = Math.sin(ay);
         const { x, z } = this;
 
-        this.x = x * cosy - z * siny;
-        this.z = x * siny + z * cosy;
+        this.x = x * cosy + z * siny;
+        this.z = -x * siny + z * cosy;
 
         return this;
     }
@@ -286,34 +302,56 @@ export class Vector3 {
         return this.rotateZ(as.z).rotateY(as.y).rotateX(as.x);
     }
 
-    rotateReverseZYX(as: Vector3) {
-        return this.rotateZ(-as.z).rotateY(-as.y).rotateX(-as.x);
-    }
-
     rotateZXY(as: Vector3) {
         return this.rotateZ(as.z).rotateX(as.x).rotateY(as.y);
     }
 
-    rotateYXZ(as: Vector3) {
-        return this.rotateZ(as.y).rotateX(as.x).rotateY(as.z);
+    rotateReverseXYZ(as: Vector3) {
+        return this.rotateX(-as.x).rotateY(-as.y).rotateZ(-as.z);
     }
 
-    rotate(as: Vector3, order: ('X' | 'Y' | 'Z')[]) {
+    rotateReverseZYX(as: Vector3) {
+        return this.rotateZ(-as.z).rotateY(-as.y).rotateX(-as.x);
+    }
+
+    rotateReverseYXZ(as: Vector3) {
+        return this.rotateY(-as.y).rotateX(-as.x).rotateZ(-as.z);
+    }
+
+    rotate(as: Vector3, order: ('X' | 'Y' | 'Z')[], dir = 1) {
         for (const a of order) {
             // this[`rotate${a}`](as[a.toLowerCase()]);
-            if (a === 'X') this.rotateX(as.x); else
-            if (a === 'Y') this.rotateY(as.y); else
-            if (a === 'Z') this.rotateZ(as.z);
+            if (a === 'X') this.rotateX(dir * as.x); else
+            if (a === 'Y') this.rotateY(dir * as.y); else
+            if (a === 'Z') this.rotateZ(dir * as.z);
         }
 
         return this;
     }
 
+    normalizeAngles() {
+        this.x %= 2 * Math.PI;
+        this.y %= 2 * Math.PI;
+        this.z %= 2 * Math.PI;
+
+        return this;
+    }
+
+    // Y
     angles() {
         return new Vector2(
             Math.atan2(this.z, this.x),
             Math.atan2(Math.sqrt(this.x * this.x + this.z * this.z), this.y),
         );
+    }
+
+    // TODO
+    anglesZ() {
+        const a = this.angles();
+        const { x, y } = a;
+        a.x = y - Math.PI / 2;
+        a.y = x - Math.PI / 2;
+        return a;
     }
 
     angleBetween(v: Vector3) {
@@ -333,6 +371,7 @@ export class Vector3 {
         return this.x * v.x + this.y * v.y + this.z * v.z;
     }
 
+    // right hand
     cross(v: Vector3) {
         return new Vector3(
             this.y * v.z - this.z * v.y,
@@ -341,8 +380,20 @@ export class Vector3 {
         );
     }
 
+    reflectByPlaneNormal(normal: Vector3) {
+        return this.minus(normal.clone().multiplyN(2 * this.dot(normal)));
+    }
+
+    getDirectionTo(p: Vector3) {
+        return p.clone().minus(this).normalize();
+    }
+
     getRayToPoint(p: Vector3) {
-        return new Ray3(this, p.clone().minus(this).normalize());
+        return new Ray3(this, this.getDirectionTo(p));
+    }
+
+    toRGB(multiplier = 255) {
+        return `rgb(${multiplier * this.x}, ${multiplier * this.y}, ${multiplier * this.z})`;
     }
 }
 

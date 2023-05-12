@@ -6,7 +6,7 @@
     import { Vector2 } from "../../libs/math/Vector2";
     import { Vector3 } from "../../libs/math/Vector3";
     import * as SHADERS from "./shaders/index";
-    import type * as TEXTURES from "./textures";
+    import * as TEXTURES from "./textures";
     import { Matrix } from "../../libs/math/Matrix";
     import { Matrix3x3 } from "../../libs/math/Matrix3x3";
     import { Helpers } from "../../helpers/common";
@@ -22,21 +22,24 @@
     import { Block, Planet } from "./physics/Planet";
     import type { Body3 } from "../../libs/physics/Body3";
     import { Texture } from "../../libs/render/Texture";
-    import { Renderer } from "./shaders/Renderer";
     import type { IDrawableGeometry } from "../../libs/drawableGeometry/DrawableGeometry";
-  import { ExposureCalculator } from "../../libs/render/ExposureCalculator";
+    import { ExposureCalculator } from "../../libs/render/ExposureCalculator";
+  import { RaytracingProgram } from "./shaders/raytracing";
 //   import HoveredElement from "./components/HoveredElement.svelte";
 
     const NUF = new Helpers.NumberUnitFormatter([
         { name: 'm', value: CONSTANTS.DISTANCE.M, countToNext: CONSTANTS.DISTANCE.KM / CONSTANTS.DISTANCE.M },
-        { name: 'km', value: CONSTANTS.DISTANCE.KM, countToNext: CONSTANTS.DISTANCE.AU / CONSTANTS.DISTANCE.KM },
+        { name: 'km', value: CONSTANTS.DISTANCE.KM, countToNext: 0.5 * CONSTANTS.DISTANCE.AU / CONSTANTS.DISTANCE.KM },
         { name: 'au', value: CONSTANTS.DISTANCE.AU, countToNext: CONSTANTS.DISTANCE.LY / CONSTANTS.DISTANCE.AU },
         { name: 'ly', value: CONSTANTS.DISTANCE.LY },
     ], {
         decimals: 2,
     });
 
-    const ENGINE = new PhysicsEngine3<'stars' | 'planets' | 'blocks', TEXTURES.TextureName>();
+    const ENGINE = new PhysicsEngine3<'stars' | 'planets' | 'blocks', TEXTURES.TextureName>({
+        mapRadius: 1e10,
+        mapCellSize: 3e9,
+    });
 
     const CAMERA_OBJ = Camera3.createWithBody({
         origin: new Vector3(0, 0, -10000),
@@ -49,27 +52,13 @@
 
     let onFrame: () => number;
     let canvas: HTMLCanvasElement;
-    let ut: Gl2Utils<TEXTURES.TextureName>;
     const state = {
         isDestroyed: false,
         isPause: false,
         isMenu: false,
+        ut: <Gl2Utils> null,
+        program: <RaytracingProgram> null,
         info: new Info(),
-        // hoveredElement: <HTMLElement> null,
-        cursor: {
-            program: <WebGLProgram> null,
-            attributes: {
-                positions: <number> null,
-            },
-        },
-        program: <WebGLProgram> null,
-        attributes: {
-            positions: <number> null,
-        },
-        uniforms: {
-            buffer: <WebGLBuffer> null,
-            textures: <WebGLBuffer> null,
-        },
         resolution: new Vector3(1, 1, 0.5),
         camera: CAMERA_OBJ.camera,
         CAMERA_OBJ,
@@ -98,12 +87,12 @@
 
     function reset() {
         state.camera.origin.setN(0, 0, 1000000000);
-        state.camera.angles.setN(0, 0, 0);
+        // state.camera.angles.setN(0, 0, 0);
+        state.camera.rotation.reset();
         state.camera.d = 0.4;
 
         CAMERA_OBJ.body.velocity.setN(0, 0, 0);
         CAMERA_OBJ.body.angleVelocity.setN(0, 0, 0);
-        CAMERA_OBJ.camera.angles.z = 0;
 
         state.lights.length = 0;
         state.objects.length = 0;
@@ -182,15 +171,17 @@
             const rot = value / 1000 / state.camera.d;
 
             if (axis === 'viewX') {
-                const v = new Vector2(0, -rot).rotate(state.camera.angles.z);
-                state.camera.angles.y += v.y * state.camera.getInversionMultiplier();
-                state.camera.angles.x += v.x;
+                // const v = new Vector2(0, -rot).rotate(state.camera.angles.z);
+                // state.camera.angles.y += v.y * state.camera.getInversionMultiplier();
+                // state.camera.angles.x += v.x;
+                state.camera.rotation.rotateRelativeY(-rot);
             }
             
             if (axis === 'viewY') {
-                const v = new Vector2(rot, 0).rotate(state.camera.angles.z);
-                state.camera.angles.x += v.x;
-                state.camera.angles.y += v.y * state.camera.getInversionMultiplier();
+                // const v = new Vector2(rot, 0).rotate(state.camera.angles.z);
+                // state.camera.angles.x += v.x;
+                // state.camera.angles.y += v.y * state.camera.getInversionMultiplier();
+                state.camera.rotation.rotateRelativeX(-rot);
             }
 
             if (axis === 'zoom') {
@@ -242,7 +233,7 @@
         canvas.width = sz.x;
         canvas.height = sz.y;
 
-        ut.gl.viewport(0, 0, sz.x, sz.y);
+        state.ut.gl.viewport(0, 0, sz.x, sz.y);
 
         state.camera.sizes.setN(sz.x, sz.y);
     }
@@ -255,14 +246,16 @@
         if (gkm.getKeyValue('moveStop')) {
             CAMERA_OBJ.body.velocity.setN(0, 0, 0);
             CAMERA_OBJ.body.angleVelocity.setN(0, 0, 0);
-            CAMERA_OBJ.camera.angles.z = 0;
+            // CAMERA_OBJ.camera.angles.z = 0;
+            // CAMERA_OBJ.camera.rotation.angle = 0;
         }
 
         zoom(+gkm.getKeyValue('zoomIn'));
         zoom(-gkm.getKeyValue('zoomOut'));
 
-        state.camera.angles.z += 0.05 * gkm.getKeyValue('viewZ+');
-        state.camera.angles.z -= 0.05 * gkm.getKeyValue('viewZ-');
+        // state.camera.angles.z += 0.05 * gkm.getKeyValue('viewZ+');
+        // state.camera.angles.z -= 0.05 * gkm.getKeyValue('viewZ-');
+        state.camera.rotation.rotateRelativeZ(0.05 * (gkm.getKeyValue('viewZ+') - gkm.getKeyValue('viewZ-')));
 
         const maxAcceleration = state.acceleration * (gkm.isKeyPressed('moveFast') ? state.accelerationBoost : 1);
 
@@ -276,14 +269,25 @@
             // .plus(dir.clone().multiplyN(gkm.getKeyValue('moveBack')))
             // .plus(dir.clone().multiplyN(-gkm.getKeyValue('moveFront')));
 
-        acceleration.x -= gkm.getKeyValue('moveLeft');
-        acceleration.x += gkm.getKeyValue('moveRight');
-        acceleration.y -= gkm.getKeyValue('moveDown');
-        acceleration.y += gkm.getKeyValue('moveUp');
-        acceleration.z -= gkm.getKeyValue('moveBack');
-        acceleration.z += gkm.getKeyValue('moveFront');
+        // acceleration.x -= gkm.getKeyValue('moveLeft');
+        // acceleration.x += gkm.getKeyValue('moveRight');
+        // acceleration.y -= gkm.getKeyValue('moveDown');
+        // acceleration.y += gkm.getKeyValue('moveUp');
+        // acceleration.z -= gkm.getKeyValue('moveBack');
+        // acceleration.z += gkm.getKeyValue('moveFront');
 
-        acceleration.rotateZXY(state.camera.angles);
+        // acceleration.rotateZXY(state.camera.angles);
+
+        acceleration
+            .plus(state.camera.rotation.forwardDirection().multiplyN(
+                gkm.getKeyValue('moveFront') - gkm.getKeyValue('moveBack')
+            ))
+            .plus(state.camera.rotation.rightDirection().multiplyN(
+                gkm.getKeyValue('moveRight') - gkm.getKeyValue('moveLeft')
+            ))
+            .plus(state.camera.rotation.topDirection().multiplyN(
+                gkm.getKeyValue('moveUp') - gkm.getKeyValue('moveDown')
+            ));
 
         // const im = state.camera.getInversionMultiplier();
         // acceleration.x *= im;
@@ -424,17 +428,21 @@
 
         state.info.show(info);
         
-        const buffer = Renderer.fillBufferRaytracing({
+        state.camera.exposure = state.autoExposure.calc(state.camera.exposure, state.ut);
+
+        const visiblePlanetsGeometry = planets.map(o => <IDrawableGeometry> o.geometry)
+            .filter(g => state.camera.isGeometryVisible(g));
+
+        // console.log(planets.length, visiblePlanetsGeometry.length);
+        
+        state.program.draw({
             camera: state.camera,
             lights: stars.map(s => <IDrawableGeometry> s.geometry),
-            objects: [...blocks, ...planets].map(o => <IDrawableGeometry> o.geometry),
+            objects: [
+                ...visiblePlanetsGeometry,
+                ...(blocks.map(o => <IDrawableGeometry> o.geometry)),
+            ]
         });
-        
-        state.camera.exposure = state.autoExposure.calc(state.camera.exposure, ut);
-
-        ut.gl.useProgram(state.program);
-        ut.updateUniformBuffer(state.uniforms.buffer, buffer);
-        ut.gl.drawArrays(ut.gl.TRIANGLE_STRIP, 0, 4);
 
         // ut.gl.useProgram(state.cursor.program);
         // ut.gl.drawArrays(ut.gl.TRIANGLE_FAN, 0, 6);
@@ -447,92 +455,51 @@
 
     onMount(async () => {
         try {
+        console.log('Mount start', state.ut);
         state.info.show('WebGL initializing', true);
-        ut = new Gl2Utils(<any> canvas.getContext('webgl2', {
+        state.ut = new Gl2Utils(<any> canvas.getContext('webgl2', {
             saveDrawingBuffer: true,
             preserveDrawingBuffer: true,
         }));
 
         state.info.show('Shaders compiling', true);
-
-
-        state.cursor.program = ut.createProgram({
-            use: true,
-            shaders: [
-                ut.compileShader(SHADERS.cursor.vertex.source, ut.gl.VERTEX_SHADER),
-                ut.compileShader(SHADERS.cursor.fragment.source, ut.gl.FRAGMENT_SHADER),
-            ],
-        });
-
-        state.cursor.attributes.positions = ut.getAttribLocation(state.cursor.program, 'position');
-
-        ut.bindBuffer(SHADERS.cursor.vertex.data);
-        ut.gl.enableVertexAttribArray(state.cursor.attributes.positions);
-        ut.gl.vertexAttribPointer(
-            state.cursor.attributes.positions,
-            2, // position is a vec2 (2 values per component)
-            ut.gl.FLOAT, // each component is a float
-            false, // don't normalize values
-            2 * 4, // two 4 byte float components per vertex (32 bit float is 4 bytes)
-            0 // how many bytes inside the buffer to start from
-        );
-
-
-        const program = ut.createProgram({
-            use: true,
-            shaders: [
-                ut.compileShader(SHADERS.raytracing.vertex.source, ut.gl.VERTEX_SHADER),
-                ut.compileShader(SHADERS.raytracing.fragment.source, ut.gl.FRAGMENT_SHADER),
-            ],
-        });
-
-        state.program = program;
-        state.attributes.positions = ut.getAttribLocation(program, 'position');
-        state.uniforms.buffer = ut.getUniformBuffer(program, 'Info', new Float32Array(16));
-
-        ut.bindBuffer(SHADERS.raytracing.vertex.data);
-        ut.gl.enableVertexAttribArray(state.attributes.positions);
-        ut.gl.vertexAttribPointer(
-            state.attributes.positions,
-            2, // position is a vec2 (2 values per component)
-            ut.gl.FLOAT, // each component is a float
-            false, // don't normalize values
-            2 * 4, // two 4 byte float components per vertex (32 bit float is 4 bytes)
-            0 // how many bytes inside the buffer to start from
-        );
-
+        
+        state.program = new RaytracingProgram(state.ut, { skyboxSource: TEXTURES.space });
 
         gkm.init(document.body);
 
         globalThis['state'] = state;
-        globalThis['ut'] = ut;
         globalThis['gkm'] = gkm;
 
         state.info.show('Loading textures', true);
 
-        const gen = ut.createLoadBindTextures(Texture.getAll(), {
-            program,
-            samplersNamePrefix: 'SAMPLER',
-            // maxWidth: 512, maxHeight: 512,
-        });
+        // const gen = state.ut.createLoadBindTextures(Texture.getAll(), {
+        //     program: state.program.program,
+        //     samplersNamePrefix: 'SAMPLER',
+        //     // maxWidth: 512, maxHeight: 512,
+        // });
 
-        for await (const texture of gen) {
-            state.info.show(`Texture: ${texture.source.rawSource}`, true);
-        }
+        // for await (const texture of gen) {
+        //     state.info.show(`Texture: ${texture.source.rawSource}`, true);
+        // }
 
         reset();
 
         state.info.show('Starting');
         draw();
+        console.log('Mount end');
         } catch (error) {
             alert('' + error + error.stack);
         }
     });
 
     onDestroy(() => {
+        console.log('Destroy start', state.ut);
         state.isDestroyed = true;
+        state.ut.destroy();
         state.info.destroy();
         gkm.destroy();
+        console.log('Destroy end');
     });
 
     // $: !state.isPause && onFrame?.();
