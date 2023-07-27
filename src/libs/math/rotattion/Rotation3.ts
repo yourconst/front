@@ -5,3 +5,5 @@ export namespace Rotation3 {
     export const Quaternion = Rotation3Quaternion;
     export const Matrix = Rotation3Matrix;
 }
+
+globalThis['Rotation3'] = Rotation3;

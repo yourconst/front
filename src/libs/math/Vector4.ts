@@ -1,5 +1,6 @@
 import { Helpers } from "../../helpers/common";
-import { Vector3 } from "./Vector3";
+import { Vector2, type Vector2Shell } from "./Vector2";
+import { Vector3, Vector3Shell } from "./Vector3";
 
 export class Vector4 {
     static createRandom(max = 1, min = 0) {
@@ -30,6 +31,38 @@ export class Vector4 {
     }
 
     constructor(public x = 0, public y = 0, public z = 0, public w = 0) { }
+
+    //#region ACCESSORS
+    private _xy?: Vector2Shell<this>;
+    get xy() { return (this._xy ??= new Vector2.Shell(this, 'x', 'y')); }
+    private _xz?: Vector2Shell<this>;
+    get xz() { return (this._xz ??= new Vector2.Shell(this, 'x', 'z')); }
+    private _yz?: Vector2Shell<this>;
+    get yz() { return (this._yz ??= new Vector2.Shell(this, 'y', 'z')); }
+    private _yx?: Vector2Shell<this>;
+    get yx() { return (this._yx ??= new Vector2.Shell(this, 'y', 'x')); }
+    private _zx?: Vector2Shell<this>;
+    get zx() { return (this._zx ??= new Vector2.Shell(this, 'z', 'x')); }
+    private _zy?: Vector2Shell<this>;
+    get zy() { return (this._zy ??= new Vector2.Shell(this, 'z', 'y')); }
+
+    private _xw?: Vector2Shell<this>;
+    get xw() { return (this._xw ??= new Vector2.Shell(this, 'x', 'w')); }
+    private _yw?: Vector2Shell<this>;
+    get yw() { return (this._yw ??= new Vector2.Shell(this, 'y', 'w')); }
+    private _zw?: Vector2Shell<this>;
+    get zw() { return (this._zw ??= new Vector2.Shell(this, 'z', 'w')); }
+    private _wx?: Vector2Shell<this>;
+    get wx() { return (this._wx ??= new Vector2.Shell(this, 'w', 'x')); }
+    private _wy?: Vector2Shell<this>;
+    get wy() { return (this._wy ??= new Vector2.Shell(this, 'w', 'y')); }
+    private _wz?: Vector2Shell<this>;
+    get wz() { return (this._wz ??= new Vector2.Shell(this, 'w', 'z')); }
+
+    private _xyz?: Vector3Shell<this>;
+    get xyz() { return (this._xyz ??= new Vector3.Shell(this, 'x', 'y', 'z')); }
+    // TODO
+    //#endregion ACCESSORS
 
     clone() {
         return new Vector4(this.x, this.y, this.z, this.w);

@@ -1,0 +1,151 @@
+* {
+    margin: 0;
+    padding: 0;
+}
+
+html{
+    width: 100%;
+    height: 100.1%;
+    margin: 0px;
+}
+
+body {
+    height: inherit;
+    width: inherit;
+    margin: 0px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow-y: hidden;
+}
+
+.hide {
+    display: none;
+}
+
+canvas {
+    position: fixed;
+    left: 0px;
+    top: 0px;
+    width: 100%;
+    height: 100%;
+}
+
+#mobileScale {
+    position: absolute;
+    left: 0px;
+    top: 0px;
+    width: 100%;
+    z-index: 1;
+    text-align: center;
+    padding-top: 10px;
+}
+
+    #mobileScale input {
+        width: 150px;
+    }
+
+#infoContainer {
+    position: absolute;
+    top: 0px;
+    right: 0px;
+    width: 100px;
+    height: 100px;
+    padding: 4px;
+    z-index: 1;
+    font-size: 22px;
+    color: white;
+    text-shadow: 0px 0px 10px black;
+}
+
+    #infoContainer td {
+        height: 24px;
+        padding: 0px;
+        overflow-y: hidden;
+        border-radius: 8px;
+        border: 3px solid lightgray;
+        box-shadow: 0px 0px 10px black;
+    }
+
+    #infoContainer div {
+        transition: 0.3s;
+        height: 24px;
+    }
+
+    #livesRange {
+        background: pink;
+    }
+    #fuelRange {
+        background: rgb(86, 177, 207);
+    }
+
+#menuContainer {
+    position: absolute;
+    left: 0px;
+    top: 0px;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.2);
+
+    z-index: 5;
+}
+
+#menuContainer table {
+    position: absolute;
+
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 24px;
+    /* font-weight: bold; */
+
+    /* color: rgb(230,230,230); */
+    color: white;
+    text-shadow: 0px 0px 10px black;
+
+    border-spacing: calc(1vw + 1vh);
+}
+
+.backLink {
+    text-decoration: underline;
+}
+
+g {
+    transition: 0.2s;
+
+    color: white;
+    cursor: pointer;
+
+    font-size: 36px;
+    font-weight: bold;
+
+    text-shadow: 0px 0px 10px black;
+    /* text-decoration: underline; */
+}
+
+    g:hover {
+        color: lightgray;
+    }
+
+input {
+    padding-top: 0px;
+    padding-bottom: 0px;
+    height: 18px;
+
+    color: white;
+    font-size: 18px;
+    font-weight: bold;
+
+    border: none;
+    background: none;
+}
+
+   /*  input[type="range"] {
+        width: 30vw !important;
+    } */
+
+    input[type="number"] {
+        width: 15vw;
+    }

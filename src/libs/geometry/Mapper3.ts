@@ -196,23 +196,47 @@ export class Mapper3<O extends MappedObject3> {
         return result;
     }
 
+    tgfi(ray: Ray3) {
+        // TODO
+    }
+
     // TODO: implementation
-    tryGetFirstRayIntersected(ray: Ray3, except?: O) {
-        let distance = Infinity;
-        let result: O;
+    tryGetFirstRayIntersected(ray: Ray3, except?: O, otherMappers?: Mapper3<O>[]) {
+        const result = {
+            distance: Infinity,
+            object: <O> null,
+        };
 
-        for (const object of this.all) if (object !== except) {
-            const _distance = object.geometry.getRayDistance(ray);
-
-            if (_distance < distance) {
-                distance = _distance;
-                result = object;
+        if (otherMappers?.length) {
+            for (const m of otherMappers) {
+                const info = m.tryGetFirstRayIntersected(ray, except);
+                if (info.distance < result.distance) {
+                    result.distance = info.distance;
+                    result.object = info.object;
+                }
             }
         }
 
+        for (const object of this.all) if (object !== except) {
+            const distance = object.geometry.getRayDistance(ray);
+
+            if (distance < result.distance) {
+                result.distance = distance;
+                result.object = object;
+            }
+        }
+
+        return result;
+    }
+
+    tryGetFirstRayIntersectedWithPoint(ray: Ray3, except?: O, otherMappers?: Mapper3<O>[]) {
+        const info = this.tryGetFirstRayIntersected(ray, except, otherMappers);
+        const point = ray.getPointByDistance(info.distance);
+
         return {
-            distance,
-            object: result,
+            ...info,
+            point,
+            relativePoint: info.object?.geometry.getRelativePoint(point),
         };
     }
 

@@ -1,4 +1,5 @@
 import { Range } from "./Range";
+import type { Ray3 } from "./Ray3";
 import { Vector3 } from "./Vector3";
 
 export class AABB3 {
@@ -129,6 +130,30 @@ export class AABB3 {
             new Vector3(x.min, y.min, z.min),
             new Vector3(x.max, y.max, z.max),
         );
+    }
+
+    getRayIntersections(r: Ray3) {
+        const t0 = (this.min.x - r.origin.x) / r.direction.x;
+        const t1 = (this.max.x - r.origin.x) / r.direction.x;
+        const t2 = (this.min.y - r.origin.y) / r.direction.y;
+        const t3 = (this.max.y - r.origin.y) / r.direction.y;
+        const t4 = (this.min.z - r.origin.z) / r.direction.z;
+        const t5 = (this.max.z - r.origin.z) / r.direction.z;
+
+        const near = Math.max(Math.min(t0, t1), Math.min(t2, t3), Math.min(t4, t5));
+        const far = Math.min(Math.max(t0, t1), Math.max(t2, t3), Math.max(t4, t5));
+
+        const intersects = !(far < 0 || near > far);
+
+        return {
+            intersects,
+            near: intersects ? Math.max(0, near) : Infinity,
+            far,
+        };
+    }
+
+    getRayDistance(r: Ray3) {
+        return this.getRayIntersections(r).near;
     }
 }
 

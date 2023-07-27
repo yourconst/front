@@ -9,7 +9,7 @@ import { WebGLStructFiller } from "../StructFiller";
 export class Filler extends WebGLStructFiller {
     static readonly sizes = {
         ...WebGLStructFiller.sizes,
-        Header: WebGLStructFiller.sizes.Matrix3x3 + 8,
+        Header: WebGLStructFiller.sizes.Matrix3x3 + 12,
         DrawableGeometry: 24,
     };
 
@@ -26,7 +26,7 @@ export class Filler extends WebGLStructFiller {
 
         this.Vector3(g.center, f32a, offset + 0, relativeTo);
         f32a[offset + 3] = isCube ? 1 : 0;
-        this.Vector3(isCube ? g.sizes : new Vector3(g.radius), f32a, offset + 4);
+        this.Vector3(isCube ? g.sizes : new Vector3(g.radius, 1.3 * g.radius, 1 / g.radius), f32a, offset + 4);
         i32a[offset + 7] = ut.getTextureIndex(g.texture);
         this.Vector3(g.color, f32a, offset + 8);
 
@@ -52,9 +52,9 @@ export class Filler extends WebGLStructFiller {
         lights: IDrawableGeometry[];
         objects: IDrawableGeometry[];
     }) {
-        const m3x3Offset = 0;
-        const headOffset = m3x3Offset + this.sizes.Matrix3x3;
-        const bodyOffset = headOffset + 8;
+        const headOffset = 0;
+        const ohOffset = headOffset + this.sizes.Matrix3x3;
+        const bodyOffset = headOffset + this.sizes.Header;
 
         const dgSize = this.sizes.DrawableGeometry;
 
@@ -65,15 +65,16 @@ export class Filler extends WebGLStructFiller {
 
         this.Matrix3x3(
             camera.getRotationMatrix3x3(),
-            f32a, m3x3Offset,
+            f32a, headOffset,
         );
-        this.Vector2(camera.sizes, f32a, headOffset);
-        f32a[headOffset + 2] = 1 / camera.exposure;
-        f32a[headOffset + 3] = camera.d;
-        f32a[headOffset + 4] = camera.distance;
-        f32a[headOffset + 5] = camera.ambient;
-        i32a[headOffset + 6] = lights.length;
-        i32a[headOffset + 7] = lights.length + objects.length;
+        this.Vector2(camera.getHalfSizes(), f32a, ohOffset);
+        f32a[ohOffset + 2] = camera.maxSize;
+        f32a[ohOffset + 3] = camera.lens.f;
+        f32a[ohOffset + 4] = 1 / camera.exposure;
+        f32a[ohOffset + 5] = camera.distance;
+        f32a[ohOffset + 6] = camera.ambient;
+        i32a[ohOffset + 7] = lights.length;
+        i32a[ohOffset + 8] = lights.length + objects.length;
 
         let offset = bodyOffset;
         for (const dgs of [lights, objects]) {

@@ -19,7 +19,7 @@ export class Gl2Program<
     Uniforms extends string = null,
     UBOs extends string = null,
 > {
-    program?: WebGLProgram;
+    program: WebGLProgram;
     readonly shaders = {
         vertex: <WebGLShader[]> [],
         fragment: <WebGLShader[]> [],
@@ -46,19 +46,35 @@ export class Gl2Program<
             ],
         });
 
-        for (const an of options.attributes) {
+        this._updateLocations(options);
+
+        this.ut.programs.add(this);
+    }
+
+    get gl() { return this.ut.gl; }
+
+    private _updateLocations(options?: {
+        attributes?: Attributes[];
+        uniforms?: Uniforms[];
+        ubos?: UBOs[];
+    }) {
+        for (const an of (options?.attributes || Object.keys(this.locations.attribute))) {
             this.locations.attribute[an] = this.ut.getAttribLocation(this.program, an);
         }
 
-        for (const un of (options.uniforms || [])) {
+        for (const un of (options?.uniforms || Object.keys(this.locations.uniform))) {
             this.locations.uniform[un] = this.ut.getUniformLocation(this.program, un);
         }
 
-        for (const ubn of (options.ubos || [])) {
+        for (const ubn of (options?.ubos || Object.keys(this.locations.ubo))) {
             this.locations.ubo[ubn] = this.ut.getUniformBuffer(this.program, ubn);
         }
+    }
 
-        this.ut.programs.add(this);
+    use() {
+        this.ut.gl.useProgram(this.program);
+        // this._updateLocations();
+        return this;
     }
 
     destroy() {

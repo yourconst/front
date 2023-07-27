@@ -1,6 +1,6 @@
 import { Helpers } from "../../helpers/common";
 import { Ray3 } from "./Ray3";
-import { Vector2 } from "./Vector2";
+import { Vector2, Vector2Shell } from "./Vector2";
 
 export class Vector3 {
     static createRandom(max = 1, min = 0) {
@@ -11,7 +11,24 @@ export class Vector3 {
         );
     }
 
-    constructor(public x = 0, public y = 0, public z = 0) { }
+    static Shell: typeof Vector3Shell;
+
+    constructor(public x = 0, public y = 0, public z = 0) {}
+
+    //#region ACCESSORS
+    private _xy?: Vector2Shell<this>;
+    get xy() { return (this._xy ??= new Vector2.Shell(this, 'x', 'y')); }
+    private _xz?: Vector2Shell<this>;
+    get xz() { return (this._xz ??= new Vector2.Shell(this, 'x', 'z')); }
+    private _yz?: Vector2Shell<this>;
+    get yz() { return (this._yz ??= new Vector2.Shell(this, 'y', 'z')); }
+    private _yx?: Vector2Shell<this>;
+    get yx() { return (this._yx ??= new Vector2.Shell(this, 'y', 'x')); }
+    private _zx?: Vector2Shell<this>;
+    get zx() { return (this._zx ??= new Vector2.Shell(this, 'z', 'x')); }
+    private _zy?: Vector2Shell<this>;
+    get zy() { return (this._zy ??= new Vector2.Shell(this, 'z', 'y')); }
+    //#endregion ACCESSORS
 
     clone() {
         return new Vector3(this.x, this.y, this.z);
@@ -396,5 +413,38 @@ export class Vector3 {
         return `rgb(${multiplier * this.x}, ${multiplier * this.y}, ${multiplier * this.z})`;
     }
 }
+
+export class Vector3Shell<
+    T extends any,
+    ValidProps extends keyof T = keyof T
+    /* , ValidProps extends KeysMatching<T, number> = KeysMatching<T, number> */
+> extends Vector3 {
+    constructor(
+        private readonly _target: T,
+        private readonly _xprop: ValidProps,
+        private readonly _yprop: ValidProps,
+        private readonly _zprop: ValidProps,
+    ) {
+        // @ts-ignore
+        super(_target[_xprop], _target[_yprop], _target[_zprop]);
+    }
+
+    // @ts-ignore
+    get x() { return this._target?.[this._xprop]; }
+    // @ts-ignore
+    set x(v) { if (this._target) this._target[this._xprop] = v; }
+
+    // @ts-ignore
+    get y() { return this._target?.[this._yprop]; }
+    // @ts-ignore
+    set y(v) { if (this._target) this._target[this._yprop] = v; }
+
+    // @ts-ignore
+    get z() { return this._target?.[this._zprop]; }
+    // @ts-ignore
+    set z(v) { if (this._target) this._target[this._zprop] = v; }
+}
+
+Vector3.Shell = Vector3Shell;
 
 globalThis['Vector3'] = Vector3;

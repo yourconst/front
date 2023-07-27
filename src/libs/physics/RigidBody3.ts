@@ -84,7 +84,7 @@ export class RigidBody3 extends Body3 {
         //     da/* .rotateReverseZYX(this.geometry.angles) */,
         // ).normalizeAngles();
         this.geometry.rotation
-            .rotateRelativeX(da.x).rotateRelativeY(da.y).rotateRelativeZ(da.z);
+            .rotateAbsoluteX(-da.x).rotateAbsoluteY(-da.y).rotateAbsoluteZ(-da.z);
             // ['m'].multiply3x3Left(Matrix3x3.createRotationFromAnglesXYZ(da));
 
         this.angleVelocity.plus(this.angleAcceleration.clone().multiplyN(dt));
@@ -116,7 +116,8 @@ export class RigidBody3 extends Body3 {
     }
 
     applyImpulseToPoint(impulse: Vector3, point: Vector3) {
-        const rv = point.clone().minus(this.geometry.center);
+        // const cm = this.geometry.getAbsoluteDirection(new Vector3(0, -0.5, 0)).plus(this.geometry.center);
+        const rv = point.clone().minus(/* cm */this.geometry.center);
         // const rvl = rv.length();
 
         // if (rvl === 0) {

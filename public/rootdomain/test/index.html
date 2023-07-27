@@ -1,0 +1,76 @@
+<link rel="stylesheet" href="input1.css">
+<style>
+body {
+    text-align: center;
+    /* height: 200%; */
+}
+input[type="number"] {
+    width: 50px;
+}
+/* canvas {
+    display: inline-block;
+    border-radius: 50%;  33 11 7 5 -5 -7 -11 -33
+} */
+</style>
+<!-- <audio id="audio" controls src="../music/1.mp3"></audio> -->
+<table cellspacing=0>
+    <tr>
+        <td colspan="2"><input type="file" id="file"></td>
+        <td></td>
+        <td>
+            <input type="button" id="addBtn" value="+">
+            <br>
+            <input type="checkbox" id="allFreq" checked>
+        </td>
+    </tr>
+    <tr><td>Gain:</td><td><input id="gainRange" class="bind" type="range" object="actx.volume" transition="0.3" from="from.pow" to="to.pow" pow="2.3" min=0 max=1 step=any></td>
+        <td></td><td id="freqCont" valign="top" rowspan="8">
+            </td>
+    </tr>
+    <tr>
+        <td>Current: <input type="button" onclick="playChange()" value="|>|"></td>
+        <td><input id="currentTimeRange" class="bind" type="range" object="actx.currentTime" transition="0.3" min=0 step=any></td>
+    </tr>
+    <tr><td>Update Time:</td><td><input class="bind" type="range" object="actx.updTime" transition="0.3" from="from.pow" to="to.pow" pow="0.5" min=0 max=0.99 step=any></td></tr>
+    <tr><td>Vertices:</td><td><input class="bind" type="range" object="actx.fCount" change="freqChange" transition="1.3" min=0 max=10 step=any></td></tr>
+    <tr><td>Mono:</td><td><input id="monoBtn" class="bind" type="checkbox" change="chanChange"><label for="monoBtn"></label></td></tr>
+    <tr><td>Effect Type:</td><td><select id="typeSelId" class="bind" transition="1.7" object="effectType" change="typeChange">
+        <option value="circle">single circle</option>
+        <option value="m circle">many circles</option>
+        <option value="spiral">spiral</option>
+    </select></td></tr>
+    <tr><td id="cntOfLoopsRow2"></td></tr>
+    <tr id="cntOfLoopsRow"><td>Loops:</td><td><input id="loopsElement" class="bind" type="number" transition="1" object="loopsCount" change="loopsChange">
+        <br>Transition:<br>
+        <input class="bind" type="range" object="loopsElement.single.oAnimation.transition" from="from.pow" to="to.pow" pow="1.8" transition="0.3" min="0" max="7" step="any"></td></tr>
+    <tr>
+            <td>Flying: <input class="bind" type="checkbox" object="flyingEnable" change="flyChange"></td>
+            <td><input class="bind" type="range" object="flyingSpeed" transition="1" min="0" max="15" from="from.pow" to="to.pow" pow="3"  step="any"></td>
+    </tr>
+    <tr><td>Multiplier:</td><td><input class="bind" type="range" object="multiplier" transition="0.3" min="-15" max="9" step="any"></td></tr>
+    <tr style="display: none;"><td>Line Width:</td><td><input class="bind" type="range" object="MATERIAL.linewidth" transition="0.3" min="0.5" max="10" step="any"></td></tr>
+    <tr>
+        <td>
+            Position:</td><td><input class="bind" type="range" object="RADIUS" transition="1.3" min="5" max="3500" step="any">
+            <br>
+            <input class="bind" type="color" change="renderer.setClearColor" object="clearColor.value">
+            | <input class="bind" type="color" object="MATERIAL.uniforms.color1.value.value">
+            <input class="bind" type="color" object="MATERIAL.uniforms.color2.value.value">
+        </td>
+        <td></td>
+        <td id="waveFormCont"></td>
+    </tr>
+    <tr><td>FOV:</td><td><input class="bind" type="range" change="updateCamera" object="camera.fov" transition="1.3" min="10" max="175" step="any"></td></tr>
+    <!-- <tr><td><input type="button" onclick="playChange()" value="|>|"></td></tr>
+    <tr><td>FOV: </td><td><input class="bind" style="height: 50px;" type="number" value="3" min="0" max="175"></td></tr> -->
+</table>
+<!-- <br><br><br><br><br><br> -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r73/three.js"></script>
+<script src="bind.js"></script>
+<script src="actx.js"></script>
+<script src="filterElement.js"></script>
+<script src="draw.js"></script>
+<script src="line.js"></script>
+<script src="figures.js"></script>
+<script src="index.js"></script>

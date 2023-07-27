@@ -4,11 +4,14 @@ import { AABB3 } from "../math/AABB3";
 import { Vector3 } from "../math/Vector3";
 import { Body3 } from "./Body3";
 import { RigidBody3 } from "./RigidBody3";
+import type { Joint3 } from "./joint/Joint3";
+import { Joint3Spring, type Joint3SpringOptions } from "./joint/JointSping3";
 
 type AdditionalProps<Groups, Names> = {
     name?: Names;
     groups?: Set<Groups>;
     checkedSet?: Set<Body3>;
+    joints?: Set<Joint3>;
 };
 
 type Body<Groups, Names> = Body3 & AdditionalProps<Groups, Names>;
@@ -19,6 +22,7 @@ export class PhysicsEngine3<Groups = null, Names = null> {
     readonly rigidMapper: Mapper3<RigidBody<Groups, Names>>;
     readonly groups = new Map<Groups, Map<Names, Body<Groups, Names>>>();
     readonly names = new Map<Names, Body<Groups, Names>>();
+    readonly joints = new Set<Joint3>();
 
     public G = 6.67430e-11;
 
@@ -87,6 +91,34 @@ export class PhysicsEngine3<Groups = null, Names = null> {
         return [...(this.groups.get(group)?.values() || [])];
     }
 
+    createJoint(options: Joint3SpringOptions) {
+        const joint = new Joint3Spring(options);
+
+        return this.addJoint(joint);
+    }
+
+    addJoint(joint: Joint3) {
+        const b1: Body<Groups, Names> = joint.bindings.first.body;
+        const b2: Body<Groups, Names> = joint.bindings.second.body;
+
+        b1.joints ??= new Set();
+        b2.joints ??= new Set();
+
+        b1.joints.add(joint);
+        b2.joints.add(joint);
+
+        this.joints.add(joint);
+
+        return this;
+    }
+
+    removeJoint(joint: Joint3) {
+        (<Body<Groups, Names>>joint.bindings.first.body).joints.delete(joint);
+        (<Body<Groups, Names>>joint.bindings.second.body).joints.delete(joint);
+        this.joints.delete(joint);
+        return this;
+    }
+
     removeBody(body: Body<Groups, Names>) {
         if (body instanceof RigidBody3) {
             this.rigidMapper.remove(body);
@@ -99,6 +131,12 @@ export class PhysicsEngine3<Groups = null, Names = null> {
         if (body.groups) {
             for (const group of body.groups) {
                 this.groups.get(group)?.delete(body.name);
+            }
+        }
+
+        if (body.joints) {
+            for (const joint of body.joints) {
+                this.removeJoint(joint);
             }
         }
 
@@ -129,6 +167,7 @@ export class PhysicsEngine3<Groups = null, Names = null> {
         this.groups.clear();
         this.rigidMapper.clear();
         this.staticMapper.clear();
+        this.joints.clear();
     }
 
     makeSatellite(options: {
@@ -253,6 +292,16 @@ export class PhysicsEngine3<Groups = null, Names = null> {
         body2.geometry.center.plus(info.normal.clone().multiplyN(-info.depth * 0.5 * b2part));
     }
 
+    calcJoints() {
+        for (const joint of this.joints) {
+            if (joint.update()) {
+                this.removeJoint(joint);
+            }
+        }
+
+        return this;
+    }
+
     calcStep(dt: number, options: {
         gravitation?: 'rigids' | Vector3 | {
             center: Vector3;
@@ -303,6 +352,8 @@ export class PhysicsEngine3<Groups = null, Names = null> {
                 this.calcPairCollision(body1, body2, info);
             }
         }
+
+        this.calcJoints();
 
         for (const body of bodies) {
             body.applyChanges(dt);

@@ -16,7 +16,7 @@ export class Renderer3dContext2d {
     }
 
     getScreenSize(absoluteSize: number, camera: Camera3) {
-        return absoluteSize * camera.d * camera.minSize * 0.0025;
+        return absoluteSize * camera.lens.f * camera.minSize * 0.0025;
     }
 
     getScreenPosition(v: Vector3, camera: Camera3) {
@@ -120,8 +120,8 @@ export class Renderer3dContext2d {
         } = options;
 
         const sp = camera.getScreenPlane();
-        const p0 = sp.normal.clone().multiplyN(camera.d + distance).plus(camera.origin);
-        const rl = length * distance / camera.d;
+        const p0 = sp.normal.clone().multiplyN(camera.lens.f + distance).plus(camera.origin);
+        const rl = length * distance / camera.lens.f;
 
         const axes = [
             new DrawableSegment3({

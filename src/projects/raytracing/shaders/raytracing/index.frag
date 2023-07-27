@@ -27,11 +27,12 @@ struct Entity {
 };
 
 uniform Info {
-    mat3x3 rotationMatrix;
-    vec2 sizes;
+    Rotation rotation;
+    vec2 halfSizes;
+    float maxSize;
+    float d;
     // TODO
     float reverseExposure;
-    float d;
     float viewDistance;
     float ambient;
     int lightsCount;
@@ -73,24 +74,13 @@ vec3 getTextureTexel(int index, vec2 uv) {
 
 vec3 getRelativeDirection(const vec3 ap, const Rotation rotation) {
     return rotation * ap;
-    // vec3 r_;
-    // r_.xy = mat2(rotation.z.x, -rotation.z.y, rotation.z.y, rotation.z.x) * ap.xy;
-    // r_.xz = mat2(rotation.y.x, -rotation.y.y, rotation.y.y, rotation.y.x) * vec2(r_.x, ap.z);
-    // r_.yz = mat2(rotation.x.x, -rotation.x.y, rotation.x.y, rotation.x.x) * r_.yz;
-    // return r_;
 }
 vec3 getRelativePoint(const vec3 ap, const Rotation rotation, const vec3 center) {
     return getRelativeDirection(ap - center, rotation);
 }
 
 vec3 getAbsoluteDirection(const vec3 rp, const Rotation rotation) {
-    return transpose(rotation) * rp;
     return rp * rotation;
-    // vec3 r_;
-    // r_.yz = mat2(rotation.x.x, rotation.x.y, -rotation.x.y, rotation.x.x) * rp.yz;
-    // r_.xz = mat2(rotation.y.x, rotation.y.y, -rotation.y.y, rotation.y.x) * vec2(rp.x, r_.z);
-    // r_.xy = mat2(rotation.z.x, rotation.z.y, -rotation.z.y, rotation.z.x) * r_.xy;
-    // return r_;
 }
 vec3 getAbsolutePoint(const vec3 rp, Rotation rotation, const vec3 center) {
     return getAbsoluteDirection(rp, rotation) + center;
@@ -126,22 +116,31 @@ vec3 Rect3_getNormal(const vec3 center, const vec3 sizes, const vec3 hitPoint, c
     else return getAbsoluteDirection(vec3(0.0, 0.0, 1.0), rotation);
 }
 
-float Sphere_getRayDistance(const vec3 center, const float radius, const Ray ray) {
+struct Range {
+    float min, max;
+};
+
+Range Sphere_getRayDistanceRange(const vec3 center, const float radius, const Ray ray) {
     vec3 toSphere = ray.origin - center;
 
-    // float l = length(toSphere);
-    // float er = 7.0;
+    float a = dot(ray.direction, ray.direction);
+    float b = 2.0 * dot(toSphere, ray.direction);
+    float c = dot(toSphere, toSphere) - radius*radius;
+    float discriminant = b*b - 4.0*a*c;
 
-    // if (er * 3.0 < radius && l - radius < er) {
-    //     if (dot(ray.direction, toSphere) < 0.0) {
-    //         return er;
-    //     }
-    //     return info.viewDistance;
-    // }
+    if(discriminant > 0.0) {
+        float _min = (-b - sqrt(discriminant)) / (2.0 * a);
+        float _max = (-b + sqrt(discriminant)) / (2.0 * a);
+        if (_max > 0.0) {
+            return Range(max(0.0, _min), _max);
+        }
+    }
 
-    // if (l < radius) {
-    //     return 0.1;
-    // }
+    return Range(info.viewDistance, info.viewDistance);
+}
+
+float Sphere_getRayDistance(const vec3 center, const float radius, const Ray ray) {
+    vec3 toSphere = ray.origin - center;
 
     float a = dot(ray.direction, ray.direction);
     float b = 2.0 * dot(toSphere, ray.direction);
@@ -158,7 +157,6 @@ float Sphere_getRayDistance(const vec3 center, const float radius, const Ray ray
 
 vec3 Sphere_getNormal(vec3 center, float radius, vec3 hitPoint) {
     return (hitPoint - center) / radius;
-    // return normalize(hitPoint - center);
 }
 
 // )
@@ -193,15 +191,19 @@ vec3 getSkyBoxHitColor(const vec3 rayDirection) {
     }
 }
 
-vec3 getHitReflectColor(const vec3 hitPoint, const float hitDistance, const vec3 hitColor, const int hitIndex, const vec3 hitNormal) {
-    vec3 reflectColor = vec3(0.0, 0.0, 0.0);
+vec3 getHitIllumination(const vec3 hitPoint, const float hitDistance, const int hitIndex, const vec3 hitNormal) {
+    vec3 illumination = vec3(0.0, 0.0, 0.0);
 
     for (int j=0; j<info.lightsCount; ++j) {
         Ray lightRay = Ray(hitPoint, normalize(info.entities[j].center - hitPoint));
-        float lightCos = dot(lightRay.direction, hitNormal);
+        float lightCos = 1.0;
 
-        if (lightCos < 0.0) {
-            continue;
+        if (hitNormal.x > -2.0) {
+            lightCos = dot(lightRay.direction, hitNormal);
+
+            if (lightCos < 0.0) {
+                continue;
+            }
         }
 
         float lightDistance = info.entities[j].type == 0 ?
@@ -241,19 +243,31 @@ vec3 getHitReflectColor(const vec3 hitPoint, const float hitDistance, const vec3
 
         if (!inDark) {
             float lightDistanceFactor = min(1.0, pow(lightDistance + hitDistance, -2.0));
-            reflectColor += hitColor * info.entities[j].color * lightCos * lightDistanceFactor;
+            illumination += info.entities[j].color * lightCos * lightDistanceFactor;
         }
     }
 
-    return reflectColor;
+    return illumination;
 }
 
+struct DiffuseHit {
+    int index;
+    float distance;
+};
+
+struct TransparentHit {
+    int index;
+    Range distanceRange;
+};
 
 vec3 getHitColor(const Ray ray) {
-    int hitIndex = -1;
-    float distance = info.viewDistance;
+    TransparentHit atmoHits[30];
+    int atmoHitsCount = 0;
+
+    DiffuseHit diffuseHit = DiffuseHit(-1, info.viewDistance);
+
     for (int i=0; i<info.count; ++i) {
-        float _distance = info.entities[i].type == 0 ?
+        float distance = info.entities[i].type == 0 ?
             Sphere_getRayDistance(
                 info.entities[i].center,
                 info.entities[i].sizes.x,
@@ -266,15 +280,63 @@ vec3 getHitColor(const Ray ray) {
                 info.entities[i].rotation
             );
 
-        if (_distance < distance) {
-            distance = _distance;
-            hitIndex = i;
+        if (distance < diffuseHit.distance) {
+            diffuseHit.index = i;
+            diffuseHit.distance = distance;
+        }
+        
+        if (info.entities[i].type != 0 || info.entities[i].sizes.x > info.entities[i].sizes.y) {
+            continue;
+        }
+
+        Range dr = Sphere_getRayDistanceRange(
+            info.entities[i].center,
+            info.entities[i].sizes.y,
+            ray
+        );
+
+        if (dr.min < diffuseHit.distance) {
+            atmoHits[atmoHitsCount] = TransparentHit(i, dr);
+            ++atmoHitsCount;
         }
     }
 
-    if (hitIndex == -1) {
-        return getSkyBoxHitColor(ray.direction);
+    vec3 atmoColor = vec3(0.0, 0.0, 0.0);
+
+    for (int i=0; i<atmoHitsCount; ++i) {
+        if (diffuseHit.distance < atmoHits[i].distanceRange.min) {
+            continue;
+        }
+
+        int hitIndex = atmoHits[i].index;
+        Range range = atmoHits[i].distanceRange;
+        range.max = min(diffuseHit.distance, range.max);
+        float atmoMultiplier = info.entities[hitIndex].sizes.z;
+
+        vec3 hitColor = info.entities[hitIndex].color;
+
+        // vec3 hitPoint = ray.origin + ray.direction * range.min;
+        // vec3 illumination = getHitIllumination(hitPoint, range.min, -1, vec3(-100.0));
+
+        vec3 illumination = vec3(0.0, 0.0, 0.0);
+
+        float cnt = 30.0;
+        float step = 1.0 / cnt;
+        for (float k=0.0; k<1.0; k += step) {
+            vec3 hitPoint = ray.origin + ray.direction * (range.min + k * (range.max - range.min));
+            illumination += getHitIllumination(hitPoint, range.min, -1, vec3(-100.0));
+        }
+        illumination /= cnt;
+
+        atmoColor += (hitColor * illumination + hitColor * info.ambient) * pow((range.max - range.min) * atmoMultiplier, 1.0);
     }
+
+    if (diffuseHit.index == -1) {
+        return atmoColor + getSkyBoxHitColor(ray.direction);
+    }
+
+    int hitIndex = diffuseHit.index;
+    float distance = diffuseHit.distance;
 
     vec3 hitPoint = ray.origin + ray.direction * distance;
     vec3 hitNormal = info.entities[hitIndex].type == 0 ?
@@ -309,18 +371,15 @@ vec3 getHitColor(const Ray ray) {
     //     return hitColor * info.entities[hitIndex].color * cos * (0.05 + distanceFactor);
     // }
 
-    vec3 reflectColor = getHitReflectColor(hitPoint, distance, hitColor, hitIndex, hitNormal);
+    vec3 illumination = getHitIllumination(hitPoint, distance, hitIndex, hitNormal);
 
-    return (hitColor * info.ambient * distanceFactor + reflectColor) * cos;
+    return atmoColor + (hitColor * info.ambient * distanceFactor + hitColor * illumination) * cos;
 }
 
 void main() {
-    float m = info.sizes.x > info.sizes.y ? info.sizes.x : info.sizes.y;
-    vec3 rp = vec3((gl_FragCoord.xy - (info.sizes * 0.5)) / m, info.d);
+    vec3 rp = vec3((gl_FragCoord.xy - info.halfSizes) / info.maxSize, info.d);
 
-    // rp.x *= -1.0;
-
-    vec3 dir3 = info.rotationMatrix * rp;
+    vec3 dir3 = getAbsoluteDirection(rp, info.rotation);
 
     Ray ray = Ray(vec3(0.0, 0.0, 0.0), normalize(dir3));
 

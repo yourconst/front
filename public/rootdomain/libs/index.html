@@ -1,0 +1,65 @@
+obj.a:
+<input class="bind" type="range" transition="0.3" object="obj.a" change="changeA" pow="3" min="-2" max="11" step="any">
+<input id="forA">
+<br>
+obj.b:
+<input class="bind" type="range" group="b" transition="0.3" object="obj.b" change="changeB" min="-77" max="11">
+<input id="forB">
+<br>
+<input class="bind" type="range" group="b" transition="0.3" pow="3" min="-77" max="11">
+<br>
+<input class="bind" type="range" group="b" transition="1" min="-77" max="11">
+<br>
+<input class="bind" type="checkbox" group="b" transition="0.3">
+<br>
+<input class="bind" type="radio" group="b" transition="0.3">
+<br>
+<input class="bind" type="number" group="b" transition="0.3">
+<br>
+obj.c:
+<input class="bind" type="range" transition="0.0" object="obj.c" change="changeC" pow="3" min="-2" max="11" step="any">
+<input id="forC">
+<br>
+obj.d:
+<select class="bind" object="obj.d" change="changeD">
+        <option value="a">a</option>
+        <option value="b">b</option>
+        <option value="c">c</option>
+        <option value="d">d</option>
+</select>
+<input id="forD">
+<br>
+<input id="forA2">
+<br>
+<input id="forB2">
+
+<script src="bind.yc.js"></script>
+
+<script>
+    var obj = {a: 7, b: -23, c: 3, d: "b"}, b = new Bind;
+
+    function changeA(val) {
+        forA.value = val;
+    }
+
+    function changeB(val) {
+        forB.value = val;
+    }
+
+    function changeC(val) {
+        forC.value = val;
+    }
+
+    function changeD(val) {
+        forD.value = val;
+    }
+
+    function main() {
+        requestAnimationFrame(main);
+
+        forA2.value = obj.a;
+        forB2.value = obj.b;
+    }
+
+    main();
+</script>

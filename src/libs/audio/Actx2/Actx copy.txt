@@ -1,0 +1,121 @@
+import type { SourceTypes } from "../actx/Source";
+import { CustomAudioNode } from "./CustomAudioNode";
+import { ChangeableSource } from "./Source/ChangeableSource";
+
+export class Actx extends CustomAudioNode implements AudioContext {
+    static tryGetActx(context: AudioContext) {
+        if (context instanceof Actx) {
+            return context;
+        }
+        if (context['_actx'] instanceof Actx) {
+            return context['_actx'];
+        }
+        return null;
+    }
+
+    readonly realContext: AudioContext;
+    constructor() {
+        super(null);
+        // @ts-ignore
+        this.context = this;
+        this.realContext = new AudioContext();
+        this.realContext['_actx'] = this;
+    }
+
+    async destructor() {
+        await this.close();
+        this.destination.disconnect();
+    }
+
+    protected getNodeIn() {
+        return this.destination;
+    }
+    protected getNodeOut;
+
+
+    createEmptyChangeableSource() {
+        return (new ChangeableSource(this));
+    }
+    async createChangeableSource(rawSource: SourceTypes) {
+        const source = this.createEmptyChangeableSource();
+        await source.setSource(rawSource);
+        return source;
+    }
+
+
+    get destination() { return this.context.destination; }
+    get audioWorklet() { return this.context.audioWorklet; }
+    get baseLatency() { return this.context.baseLatency; }
+    get currentTime() { return this.context.currentTime; }
+    get listener() { return this.context.listener; }
+
+    get onstatechange() { return this.context.onstatechange; }
+    set onstatechange(v) { this.context.onstatechange = v; }
+    
+    get outputLatency() { return this.context.outputLatency; }
+    get sampleRate() { return this.context.sampleRate; }
+    get state() { return this.context.state; }
+
+    getOutputTimestamp() {
+        return this.context.getOutputTimestamp();
+    }
+
+    decodeAudioData(audioData: ArrayBuffer, successCallback?: DecodeSuccessCallback, errorCallback?: DecodeErrorCallback) {
+        return this.context.decodeAudioData(audioData, successCallback, errorCallback);
+    }
+
+    async close() {
+        await this.context.close();
+    }
+    async resume() {
+        await this.context.resume();
+    }
+    async suspend() {
+        await this.context.suspend();
+    }
+
+    createAnalyser() { return (this.context.createAnalyser()); }
+    createBiquadFilter() { return (this.context.createBiquadFilter()); }
+    createBuffer(numberOfChannels: number, length: number, sampleRate: number) {
+        return this.context.createBuffer(numberOfChannels, length, sampleRate);
+    }
+    createBufferSource() { return (this.context.createBufferSource()); }
+    createChannelMerger(numberOfInputs?: number) {
+        return (this.context.createChannelMerger(numberOfInputs));
+    }
+    createChannelSplitter(numberOfOutputs?: number) {
+        return (this.context.createChannelMerger(numberOfOutputs));
+    }
+    createConstantSource() { return (this.context.createConstantSource()); }
+    createConvolver() { return (this.context.createConvolver()); }
+    createDelay(maxDelayTime?: number) {
+        return (this.context.createDelay(maxDelayTime));
+    }
+    createDynamicsCompressor() { return (this.context.createDynamicsCompressor()); }
+    createGain() { return (this.context.createGain()); }
+    createIIRFilter(feedforward: number[], feedback: number[]): IIRFilterNode;
+    createIIRFilter(feedforward: Iterable<number>, feedback: Iterable<number>): IIRFilterNode;
+    createIIRFilter(feedforward: any, feedback: any) {
+        return (this.context.createIIRFilter(feedforward, feedback));
+    }
+    createMediaElementSource(mediaElement: HTMLMediaElement) {
+        return (this.context.createMediaElementSource(mediaElement));
+    }
+    createMediaStreamDestination() { return this.context.createMediaStreamDestination(); }
+    createMediaStreamSource(mediaStream: MediaStream) {
+        return (this.context.createMediaStreamSource(mediaStream));
+    }
+    createOscillator() { return (this.context.createOscillator()); }
+    createPanner() { return (this.context.createPanner()); }
+    createPeriodicWave(real: number[] | Float32Array, imag: number[] | Float32Array, constraints?: PeriodicWaveConstraints): PeriodicWave;
+    createPeriodicWave(real: Iterable<number>, imag: Iterable<number>, constraints?: PeriodicWaveConstraints): PeriodicWave;
+    createPeriodicWave(real: any, imag: any, constraints?: any) {
+        return this.context.createPeriodicWave(real, imag, constraints);
+    }
+    /** @deprecated */
+    createScriptProcessor(bufferSize?: number, numberOfInputChannels?: number, numberOfOutputChannels?: number) {
+        return (this.context.createScriptProcessor(bufferSize, numberOfInputChannels, numberOfOutputChannels));
+    }
+    createStereoPanner() { return (this.context.createStereoPanner()); }
+    createWaveShaper() { return (this.context.createWaveShaper()); }
+}

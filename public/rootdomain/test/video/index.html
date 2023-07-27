@@ -1,0 +1,28 @@
+<style>
+    #video, #canvas {
+        display: none;
+    }
+</style>
+<input type="file" id="file"><br>
+<input type="button" onclick="if(actx.paused)actx.play(); else actx.pause();" value="|>|"><br>
+<input class="bind" type="range" object="actx.volume" transition="0.3" step="any" min=0 max=1><br>
+<input class="bind" id="ACTime" type="range" object="actx.currentTime" transition="1" step="any" min=0 max=53><br>
+<input class="bind" type="range" object="audioMult" transition="1" step="any" min=-9 max=9><input class="bind" type="checkbox" object="audioMult" transition="1.3"><br>
+<input type="button" onclick="if(video.paused)video.play(); else video.pause();" value="|>|"><br>
+<input class="bind" type="range" object="video.volume" transition="0.3" step="any" min=0 max=1><br>
+<input class="bind" type="range" object="video.currentTime" transition="1" step="any" min=0 max=53><br>
+<input class="bind" type="range" object="camera.fov" transition="0.3" step="any" min=100 max=1000><br>
+<input class="bind" type="range" object="flyingSpeed" transition="0.5" step="any" min=0 max=100>
+<input class="bind" type="checkbox" object="flyingEnable" change="flyChange"><br>
+<input class="bind" type="range" object="RADIUS" transition="1.3" step="any" min=0 max=10000><br>
+<input class="bind" type="range" object="mult" transition="1.3" step="any" min=-9 max=9><input class="bind" type="checkbox" object="mult" transition="1.3"><br>
+
+
+<video id="video" controls></video>
+<canvas id="canvas"></canvas>
+<br><br><br><br>
+
+<script src="../bind.js"></script>
+<script src="../actx.js"></script>
+<script src="camera.js"></script>
+<script src="main.js"></script>

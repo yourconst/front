@@ -38,4 +38,6 @@ export interface IRotation3 {
     forwardDirection(): Vector3;
     topDirection(): Vector3;
     rightDirection(): Vector3;
+
+    setDirection(d: Vector3): this;
 }

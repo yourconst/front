@@ -36,6 +36,12 @@ export class Body3 {
         return true;
     }
 
+    stop() {
+        this.velocity.setN(0, 0, 0);
+        this.angleVelocity.setN(0, 0, 0);
+        return this;
+    }
+
     getPointAngularVelocity(point: Vector3) {
         return this.angleVelocity.cross(point.clone().minus(this.geometry.center));
     }
@@ -45,6 +51,14 @@ export class Body3 {
         // return this.velocity.clone();
     }
 
+    applyForceToPoint(force: Vector3, point: Vector3) {
+        return this;
+    }
+    
+    applyImpulseToPoint(impulse: Vector3, point: Vector3) {
+        return this;
+    }
+
     applyChanges(dt: number) {
         this.geometry.center.plus(
             this.velocity.clone().multiplyN(dt),
@@ -52,7 +66,7 @@ export class Body3 {
 
         const da = this.angleVelocity.clone().multiplyN(dt);
         this.geometry.rotation
-            .rotateRelativeX(da.x).rotateRelativeY(da.y).rotateRelativeZ(da.z);
+            .rotateAbsoluteX(-da.x).rotateAbsoluteY(-da.y).rotateAbsoluteZ(-da.z);
             // ['m'].multiply3x3Left(Matrix3x3.createRotationFromAnglesXYZ(da));
     }
 }

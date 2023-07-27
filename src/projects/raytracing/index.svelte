@@ -89,7 +89,7 @@
         state.camera.origin.setN(0, 0, 1000000000);
         // state.camera.angles.setN(0, 0, 0);
         state.camera.rotation.reset();
-        state.camera.d = 0.4;
+        state.camera.lens.f = 0.4;
 
         CAMERA_OBJ.body.velocity.setN(0, 0, 0);
         CAMERA_OBJ.body.angleVelocity.setN(0, 0, 0);
@@ -154,7 +154,7 @@
         if (!value) return;
 
         const c = 1.15;
-        state.camera.d *= value > 0 ? c : (1 / c);
+        state.camera.lens.f *= value > 0 ? c : (1 / c);
     }
 
     function isInputElementActive() {
@@ -168,7 +168,7 @@
         // console.log(axis);
 
         if (document.pointerLockElement === canvas) {
-            const rot = value / 1000 / state.camera.d;
+            const rot = value / 1000 / state.camera.lens.f;
 
             if (axis === 'viewX') {
                 // const v = new Vector2(0, -rot).rotate(state.camera.angles.z);
@@ -457,8 +457,8 @@
         try {
         console.log('Mount start', state.ut);
         state.info.show('WebGL initializing', true);
-        state.ut = new Gl2Utils(<any> canvas.getContext('webgl2', {
-            saveDrawingBuffer: true,
+        state.ut = new Gl2Utils(canvas.getContext('webgl2', {
+            // saveDrawingBuffer: true,
             preserveDrawingBuffer: true,
         }));
 
@@ -538,7 +538,7 @@
     bind:resolution={state.resolution.z}
     bind:exposure={state.camera.exposure}
     bind:autoExposure={state.autoExposure}
-    bind:fov={state.camera.d}
+    bind:fov={state.camera.lens.f}
     bind:viewDistance={state.camera.distance}
     bind:acceleration={state.acceleration}
     bind:accelerationBoost={state.accelerationBoost}

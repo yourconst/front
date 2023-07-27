@@ -15,7 +15,7 @@
     import { Texture } from "../../libs/render/Texture";
     import type { IDrawableGeometry } from "../../libs/drawableGeometry/DrawableGeometry";
     import { ExposureCalculator } from "../../libs/render/ExposureCalculator";
-    import { RaytracingProgram } from "../../projects/raytracing/shaders/raytracing";
+    import { PathtracingProgram } from "../../projects/raytracing/shaders/pathtracing";
     import * as TEXTURES from "../../projects/raytracing/textures/index";
     import { CONSTANTS } from "../../projects/raytracing/configs/constants";
     import { DrawableCube } from "../../libs/drawableGeometry/DrawableCube";
@@ -47,7 +47,7 @@
             distance: 1e15,
         }),
         body: new RigidBody3({
-            geometry: new DrawableSphere/* DrawableCube */({
+            geometry: new /* DrawableSphere */DrawableCube({
                 center: new Vector3(0, 0, 0),
                 radius: 1,
                 color: new Vector3(0.5, 0.5, 0.5),
@@ -60,7 +60,7 @@
         geometry: new DrawableSphere({
             center: new Vector3(0, 100, 0),
             radius: 10,
-            color: new Vector3(1,1,1).multiplyN(1000),
+            color: new Vector3(1,1,1).multiplyN(1000000),
             texture: Texture.create(TEXTURES.moon),
         }),
     });
@@ -85,40 +85,55 @@
     let canvas2d: HTMLCanvasElement;
     const state = {
         isDestroyed: false,
-        isPause: true,
-        isMenu: false,
-        showDebug: true,
+        isPause: false,
+        isMenu: true,
+        showDebug: false,
         ut: <Gl2Utils> null,
         r32d: <Renderer3dContext2d> null,
-        program: <RaytracingProgram> null,
+        program: <PathtracingProgram> null,
         info: <Info> null,
-        resolution: new Vector3(1, 1, 0.5),
+        resolution: new Vector3(1, 1, 1),
         camera: CAMERA_OBJ.camera,
         CAMERA_OBJ,
         LIGHT,
         GROUND,
         ENGINE,
         gravity: 10,
-        acceleration: 3, // Infinity, // 1e6,
-        accelerationBoost: 10,
+        acceleration: 1, // Infinity, // 1e6,
+        accelerationBoost: 50,
         time: 0,
         timeMultiplier: 1,
+        playerDisabled: false,
+        _physicsDisabled: false,
+        get physicsDisabled() { return state._physicsDisabled || state.playerDisabled; },
+        set physicsDisabled(v) { state._physicsDisabled = v; },
         autoExposure: new ExposureCalculator({ range: new Range(1, 5), enabled: true }),
+        selected: {
+            object: <Body3> null,
+            distance: Infinity,
+            point: <Vector3> null,
+            relativePoint: <Vector3> null,
+        },
         hovered: {
             object: <Body3> null,
             distance: Infinity,
+            point: <Vector3> null,
+            relativePoint: <Vector3> null,
         },
+        lookAtPoint: <Vector3> null,
     };
 
-    state.camera.ambient = 1;
+    state.camera.ambient = 0.01;
     state.camera.exposure = 4;
-    // state.autoExposure.enabled = false;
+    state.camera.pathtracing.depth = 10;
+    state.camera.pathtracing.perPixelCount = 1;
+    state.autoExposure.enabled = false;
 
     function reset() {
         state.camera.origin.setN(0, 0, 0);
         // state.camera.angles.setN(0, 0, 0);
         state.camera.rotation.reset();
-        state.camera.d = 0.4;
+        state.camera.lens.f = 0.7;
 
         CAMERA_OBJ.body.geometry.center.setN(0, 0, 0);
         CAMERA_OBJ.body.velocity.setN(0, 0, 0);
@@ -174,10 +189,11 @@
     });
 
     function zoom(value: number) {
+        if (state.playerDisabled) return;
         if (!value) return;
 
         const c = 1.15;
-        state.camera.d *= value > 0 ? c : (1 / c);
+        state.camera.lens.f *= value > 0 ? c : (1 / c);
     }
 
     function isInputElementActive() {
@@ -188,8 +204,10 @@
     }
 
     gkm.addListener('axismove', (axis, value, src) => {
+        if (state.playerDisabled) return;
+
         if (document.pointerLockElement === canvas2d) {
-            const rot = value / 1000 / state.camera.d;
+            const rot = value / 1000 / state.camera.lens.f;
 
             if (axis === 'viewX') {
                 state.camera.rotation.rotateRelativeY(-rot);
@@ -206,24 +224,77 @@
     });
 
     gkm.addListener('keydown', (key, value) => {
-        if (key === 'menu') {
+        if (key === 'pause') {
             // state.timeMultiplier = Number(!!state.timeMultiplier);
             // state.isMenu = !state.isMenu;
             state.isPause = !state.isPause;
         } else
-        if (key === 'pause') {
-            state.timeMultiplier = Math.fround(Math.abs(state.timeMultiplier - 0.99));
+        if (key === 'KeyN') {
+            state.physicsDisabled = !state.physicsDisabled;
+            if (state.physicsDisabled) CAMERA_OBJ.body.stop();
+        } else
+        if (key === 'KeyM') {
+            state.playerDisabled = !state.playerDisabled;
+            if (state.playerDisabled) state.program.samplingStart();
+            else state.program.samplingStop();
+        }
+
+        if (state.playerDisabled) return;
+
+        if (key === 'Digit0') {
+            state.camera.lens._enabled = !state.camera.lens._enabled;
+        }
+
+        if (key === 'KeyO') {
+            // state.timeMultiplier = Math.fround(Math.abs(state.timeMultiplier - 0.99));
+            if (ENGINE.rigidMapper['all'].has(CAMERA_OBJ.body)) {
+                ENGINE.rigidMapper.remove(CAMERA_OBJ.body);
+                ENGINE.staticMapper.add(CAMERA_OBJ.body);
+            } else {
+                ENGINE.rigidMapper.add(CAMERA_OBJ.body);
+                ENGINE.staticMapper.remove(CAMERA_OBJ.body);
+            }
+            CAMERA_OBJ.body.stop();
         } else
         if (key === 'reset') {
             reset();
         } else
-        if (key === 'fire') {
+        if (key === 'Delete') {
             if (state.hovered.object instanceof RigidBody3) {
                 ENGINE.removeBody(state.hovered.object);
             }
         } else
         if (key === 'aim') {
             tryAddRandomRigid();
+        } else
+        if (key === 'fire') {
+            const info = state.ENGINE.staticMapper.tryGetFirstRayIntersectedWithPoint(
+                state.camera.getCenterRay(),
+                undefined,
+                [state.ENGINE.rigidMapper],
+            );
+
+            if (state.selected.object !== info.object) {
+                if (state.selected.object && info.object) {
+                    state.ENGINE.createJoint({
+                        first: {
+                            body: state.selected.object,
+                            relativePoint: state.selected.relativePoint,
+                        },
+                        second: {
+                            body: info.object,
+                            relativePoint: info.relativePoint,
+                        },
+                    });
+                    state.selected.object = null;
+                } else {
+                    state.selected = info;
+                }
+            } else {
+                state.selected.object = null;
+            }
+
+            console.log(state.selected);
         }
     });
 
@@ -267,7 +338,10 @@
     function checkResolution() {
         const sz = state.resolution;
 
-        sz.setN(window.innerWidth * sz.z, window.innerHeight * sz.z);
+        sz.setN(
+            Math.trunc(window.innerWidth * sz.z),
+            Math.trunc(window.innerHeight * sz.z),
+        );
 
         if (sz.isEqualsN(canvas3d.width, canvas3d.height)) {
             return;
@@ -279,16 +353,25 @@
         state.ut.gl.viewport(0, 0, sz.x, sz.y);
 
         state.camera.sizes.setN(sz.x, sz.y);
+
+        state.program.updateResolution();
     }
 
     function checkKeys() {
+        if (state.playerDisabled) return;
         if (isInputElementActive()) {
             return;
         }
 
+        if (gkm.getKeyValue('Minus')) {
+            state.camera.lens.d *= 1 - state.camera.lens._movePart;
+        } else
+        if (gkm.getKeyValue('Equal')) {
+            state.camera.lens.d /= 1 - state.camera.lens._movePart;
+        }
+
         if (gkm.getKeyValue('moveStop')) {
-            CAMERA_OBJ.body.velocity.setN(0, 0, 0);
-            CAMERA_OBJ.body.angleVelocity.setN(0, 0, 0);
+            CAMERA_OBJ.body.stop();
         }
 
         zoom(+gkm.getKeyValue('zoomIn'));
@@ -333,17 +416,30 @@
         checkResolution();
         checkKeys();
 
+        if (state.lookAtPoint) {
+            state.camera.lookAt(state.lookAtPoint);
+        }
+
         const dt = onFrame() / 1000 * state.timeMultiplier;
         state.time += dt;
 
         state.GROUND.geometry.center.y = -state.GROUND.geometry.radius - 1;
 
+        if (!state.physicsDisabled)
         ENGINE.calcStep(dt, {
             gravitation: {
                 center: state.GROUND.geometry.center,
                 acceleration: state.gravity,
             },
         });
+        else if (!state.playerDisabled) {
+            state.CAMERA_OBJ.body.applyChanges(dt);
+            if (ENGINE.rigidMapper['all'].has(state.CAMERA_OBJ.body)) {
+                ENGINE.rigidMapper.update(state.CAMERA_OBJ.body);
+            } else {
+                ENGINE.staticMapper.update(state.CAMERA_OBJ.body);
+            }
+        }
 
         // camera position
         // {
@@ -360,24 +456,21 @@
         //         /* toGround */.multiplyN(5 * player.geometry.radius),
         //     );
         // }
-        state.camera.origin.set(CAMERA_OBJ.body.geometry.center).minus(
-            state.camera.getDirection()
-                .multiplyN(state.CAMERA_OBJ.body.geometry.radius * 10)
-                .plus(
-                    CAMERA_OBJ.body.geometry.center.getDirectionTo(state.GROUND.geometry.center)
-                        .multiplyN(4 * state.CAMERA_OBJ.body.geometry.radius),
-                ),
+        state.camera.origin.set(CAMERA_OBJ.body.geometry.center).plus(
+            state.camera.rotation.forwardDirection()
+                .multiplyN(-state.CAMERA_OBJ.body.geometry.radius * 10),
+        ).plus(
+            state.camera.rotation.topDirection()
+            // state.GROUND.geometry.center.getDirectionTo(CAMERA_OBJ.body.geometry.center)
+                .multiplyN(state.CAMERA_OBJ.body.geometry.radius * 5)
         );
 
-        state.hovered = ENGINE.rigidMapper.tryGetFirstRayIntersected(
+        state.hovered = ENGINE.staticMapper.tryGetFirstRayIntersectedWithPoint(
             state.camera.getCenterRay(),
             CAMERA_OBJ.body,
+            [ENGINE.rigidMapper],
         );
-        if (!state.hovered.object) {
-            state.hovered = ENGINE.staticMapper.tryGetFirstRayIntersected(
-                state.camera.getCenterRay(),
-            );
-        }
+        state.camera.lens.focusOn(state.hovered.distance);
 
         const rigids = ENGINE.rigidMapper.getAll();
         const statics = ENGINE.staticMapper.getAll();
@@ -399,11 +492,41 @@
             objects: [
                 ...visibleRigidsGeometry,
                 ...statics.map(o => <IDrawableGeometry> o.geometry),
+                ...[...ENGINE.joints].map(j => j.getGeometry()).flat(),
             ],
         });
 
-        state.r32d.clear();
+        if (state.playerDisabled) {
+            // const res = state.resolution;
+            // const c = Helpers.Canvas.createOffscreen(res.x, res.y);
+            // const ctx: CanvasRenderingContext2D = <any> c.getContext('2d');
+            // ctx.drawImage(state.ut.gl.canvas, 0, 0);
+
+            // const src = ctx.getImageData(0, 0, res.x, res.y);
+            // const id = state.r32d.ctx.getImageData(0, 0, res.x, res.y);
+
+            // const cnt = state.framesRendered;
+
+            // const l = id.data.length;
+            // for (let i=0; i<l; i+=4) {
+            //     id.data[i+0] = (id.data[i+0] * cnt + src.data[i+0]) / (cnt + 1);
+            //     id.data[i+1] = (id.data[i+1] * cnt + src.data[i+1]) / (cnt + 1);
+            //     id.data[i+2] = (id.data[i+2] * cnt + src.data[i+2]) / (cnt + 1);
+            //     id.data[i+3] = 255;
+            // }
+
+            // state.r32d.ctx.putImageData(id, 0, 0);
+
+            // state.r32d.ctx.drawImage(state.ut.gl.canvas, 0, 0, state.resolution.x, state.resolution.y);
+            // state.r32d.ctx.globalAlpha = 1 / (1 + state.framesRendered);
+            // state.r32d.ctx.drawImage(state.ut.gl.canvas, 0, 0, state.resolution.x, state.resolution.y);
+            // ++state.framesRendered;
+        } else {
+            state.r32d.clear();
+        }
+
         if (state.showDebug) {
+            // state.r32d.clear();
             // state.r32d.drawObjects([<any> state.LIGHT.geometry], state.camera);
             state.r32d.drawObjects(ENGINE.rigidStaticCollisions.map(c => {
                 return [
@@ -418,10 +541,10 @@
                 // const ax = new Vector3(r, 0, 0).rotateXYZ(g.angles).plus(p0);
                 // const ay = new Vector3(0, r, 0).rotateXYZ(g.angles).plus(p0);
                 // const az = new Vector3(0, 0, r).rotateXYZ(g.angles).plus(p0);
-                const p0 = g.rotation.getRelativeVector(new Vector3(0, g.radius, 0)).plus(g.center);
-                const ax = g.rotation.getRelativeVector(new Vector3(r, 0, 0)).plus(p0);
-                const ay = g.rotation.getRelativeVector(new Vector3(0, r, 0)).plus(p0);
-                const az = g.rotation.getRelativeVector(new Vector3(0, 0, r)).plus(p0);
+                const p0 = g.center.clone();
+                const ax = g.rotation.rightDirection().multiplyN(r).plus(p0);
+                const ay = g.rotation.topDirection().multiplyN(r).plus(p0);
+                const az = g.rotation.forwardDirection().multiplyN(r).plus(p0);
                 return [
                     new DrawableSegment3({ p0, p1: ax, color: new Vector3(1,0,0) }),
                     new DrawableSegment3({ p0, p1: ay, color: new Vector3(0,1,0) }),
@@ -437,6 +560,9 @@
         state.info.show(info);
     };
 
+    // const octx: CanvasRenderingContext2D = <any> Helpers.Canvas.createOffscreen(100, 100).getContext('2d');
+    // octx.globalAlpha = 0.5;
+
     onMount(() => {
         try {
         console.log('Mount start', state.ut);
@@ -444,14 +570,15 @@
         state.r32d = new Renderer3dContext2d(canvas2d.getContext('2d'));
 
         // state.info.show('WebGL initializing', true);
-        state.ut = new Gl2Utils(<any> canvas3d.getContext('webgl2', {
-            saveDrawingBuffer: true,
-            preserveDrawingBuffer: true,
+        state.ut = new Gl2Utils(canvas3d.getContext('webgl2', {
+            // saveDrawingBuffer: true,
+            // preserveDrawingBuffer: true,
+            powerPreference: 'high-performance',
         }));
 
         // state.info.show('Shaders compiling', true);
         
-        state.program = new RaytracingProgram(state.ut, { skyboxSource: TEXTURES.space });
+        state.program = new PathtracingProgram(state.ut, { skyboxSource: TEXTURES.space });
 
         gkm.init(document.body);
 

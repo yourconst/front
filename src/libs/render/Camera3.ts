@@ -7,6 +7,7 @@ import { RigidBody3, type RigidBody3Options } from "../physics/RigidBody3";
 import { Plane3 } from "../math/Plane3";
 import type { IRotation3 } from "../math/rotattion/IRotation3";
 import { Rotation3 } from "../math/rotattion/Rotation3";
+import { Lens, type LensOptions } from "./Lens";
 
 export interface Camera3Options {
     origin?: Vector3;
@@ -15,6 +16,7 @@ export interface Camera3Options {
     d?: number;
     distance?: number;
     ambient?: number;
+    lens?: LensOptions;
 }
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
@@ -45,19 +47,22 @@ export class Camera3 {
     rotation: IRotation3;
     // angles: Vector3;
     exposure: number;
-    d: number;
     distance: number;
     ambient: number;
     
     sizes = new Vector2(1920, 1080);
     // rotation: Matrix3x3;
 
-    constructor(options: Camera3Options) {
+    pathtracing = {
+        depth: 5,
+        perPixelCount: 10,
+    };
+
+    constructor(options: Camera3Options, public lens = new Lens(options?.lens)) {
         this.origin = options.origin ?? new Vector3();
         // this.rotation = CameraRotation.createByAngles(options.angles);
         this.rotation = Rotation3.Quaternion.createXYZ(options.angles);
         this.exposure = options.exposure || 2.2;
-        this.d = options.d || 1;
         this.distance = options.distance || Infinity;
         this.ambient = options.ambient || 0.1;
 
@@ -76,6 +81,10 @@ export class Camera3 {
         return this.sizes.min();
     }
 
+    get maxSize() {
+        return this.sizes.max();
+    }
+
     getRelativeHalfSizes() {
         return this.getHalfSizes().divideN(this.minSize);
     }
@@ -84,7 +93,7 @@ export class Camera3 {
         // const angles = point.clone().minus(this.origin).normalize().anglesZ();
         // this.angles.setN(angles.x, angles.y);
     
-        // this.rotation.direction.set(this.origin.getDirectionTo(point));
+        this.rotation.setDirection(this.origin.getDirectionTo(point));
 
         return this;
     }
@@ -106,7 +115,7 @@ export class Camera3 {
     getScreenPlane() {
         const r = this.getCenterRay();
         // return new Plane3(r.getPointByDistance(this.d), r.direction, this.angles.z);
-        return new Plane3(r.getPointByDistance(this.d), r.direction, this.rotation.clone());
+        return new Plane3(r.getPointByDistance(this.lens.f), r.direction, this.rotation.clone());
     }
 
     getRotationMatrix3x3() {
@@ -120,11 +129,11 @@ export class Camera3 {
     // }
 
     getAbsoluteDistancedSize(distance: number, relativeSize: number) {
-        return relativeSize * this.d / distance;
+        return relativeSize * this.lens.f / distance;
     }
 
     getRelativeDistancedSize(distance: number, absoluteSize: number) {
-        return absoluteSize * this.d / distance;
+        return absoluteSize * this.lens.f / distance;
     }
 
     isGeometryVisible(g: Geometry3) {
@@ -142,7 +151,7 @@ export class Camera3 {
 
     _getViewPyramidConfig() {
         const rhs = this.getRelativeHalfSizes();
-        const bv = new Vector3(rhs.x, rhs.y, this.d * this.pyramidMultiplier);
+        const bv = new Vector3(rhs.x, rhs.y, this.lens.f * this.pyramidMultiplier);
 
         return {
             centerRay: this.getCenterRay(),

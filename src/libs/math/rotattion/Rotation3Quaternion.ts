@@ -89,4 +89,9 @@ export class Rotation3Quaternion implements IRotation3 {
     rightDirection() {
         return this.getAbsoluteVector(new Vector3(1, 0, 0));
     }
+
+    setDirection(d: Vector3) {
+        this.q.setDirection(d);
+        return this;
+    }
 }

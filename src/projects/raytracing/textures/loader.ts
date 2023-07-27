@@ -15,6 +15,8 @@ export { default as venus } from './venus.jpg';
 
 // export const earth = 'https://www.solarsystemscope.com/textures/download/8k_earth_daymap.jpg';
 export { default as earth } from './earth.jpg';
+export { default as earthNormalMap } from './earth_normal_map.jpg';
+export { default as earthSpecularMap } from './earth_specular_map.jpg';
 
 // export const moon = 'https://www.solarsystemscope.com/textures/download/8k_moon_daymap.jpg';
 export { default as moon } from './moon.jpg';

@@ -34,7 +34,7 @@ export default defineConfig({
   // publicDir: './public',
   base: './',
   plugins: [svelte()],
-  assetsInclude: ['**/*.frag', '**/*.vert'],
+  assetsInclude: ['**/*.frag', '**/*.vert', '**/*.tif'],
   build: {
     rollupOptions: {
       input: filenames,

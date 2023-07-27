@@ -1,0 +1,45 @@
+<html>
+    <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-status-bar-style" content="black">
+        
+        <link rel="stylesheet" href="menuButton.css">
+        <link rel="stylesheet" href="input.css">
+        <link rel="stylesheet" href="style.css">
+    </head>
+    <body>
+        <div id="menuContainer">
+            <div class="page" pageName="main">
+                <table>
+                        <tr><td><g onclick="gui.play = true">Play</g></td></tr>
+                        <tr><td><g class="pageLink" pageName="settings">Settings</g></td></tr>
+                        <tr><td><g class="pageLink" pageName="statistic">Statistic</g></td></tr>
+                </table>
+            </div>
+            <div class="page" pageName="settings">
+                <table>
+                    <tr>
+                        <td>Resolution:</td>
+                        <td><input class="bind" type="number" group="resol" change="checkDraw" object="drawer.resolution" min="0.2" max="2" step="any" /></td>
+                    </tr>
+                    <tr><td colspan="2"><input class="bind" type="range" group="resol" change="checkDraw" from="from.pow" to="to.pow" pow="3" min="0.33" max="2" step="any" /></td></tr>
+                    <tr>
+                        <td>Image scale:</td>
+                        <td><input class="bind" type="number" group="imgscale" change="checkDraw" object="drawer.scale" min="0.01" max="1" step="any" /></td>
+                    </tr>
+                    <tr><td colspan="2"><input class="bind" type="range" group="imgscale" change="checkDraw" from="from.pow" to="to.pow" pow="3" min="0.01" max="1" step="any" /></td></tr>
+                    <tr><td><g class="pageLink" pageName="main">Back</g></td></tr>
+                </table>
+            </div>
+            <div class="page" pageName="statistic">
+                <table>
+                    <tr><td><g onclick="sendStatistic()">Send</g></td></tr>
+                    <tr><td><g class="pageLink" pageName="main">Back</g></td></tr>
+                </table>
+            </div>
+        </div>
+        <menubtn></menubtn>
+        <script src="index.build.js"></script>
+    </body>
+</html>

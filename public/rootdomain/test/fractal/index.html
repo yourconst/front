@@ -1,0 +1,60 @@
+<table cellpadding=0>
+    <tr><td></td><td><input type="file" id="file"></td></tr>
+    <tr>
+        <td>Volume: </td>
+        <td>
+            <input class="bind" type="range" object="actx.volume" transition="0.3" step="any" min=0 max=1>
+            <input type="button" onclick="if(actx.paused)actx.play(); else actx.pause();" value="|>|">
+            <input class="bind" id="ACTime" type="range" object="actx.currentTime" transition="1" step="any" min=0 max=53>
+        </td>
+    </tr>
+    <tr>
+        <td>Audio Multiplicator: </td>
+        <td>
+            <input class="bind" type="range" group="amult" object="audioMult" transition="1" step="any" min=0 max=15>
+            <input class="bind" type="checkbox" group="amult" transition="1.3"> 
+            <input class="bind" type="range" object="actx.mainDataSize" transition="1" step="1" min=0 max=10>
+        </td>
+    </tr>
+    <tr>
+        <td>FOV: </td>
+        <td><input class="bind" type="range" object="camera.fov" transition="1" step="any" min=100 max=1000></td>
+    </tr>
+    <tr>
+        <td>Flying:</td>
+        <td>
+            <input class="bind" type="range" object="flyingSpeed" transition="0.5" step="any" min=0 max=100>
+            <input class="bind" type="checkbox" object="flyingEnable" change="flyChange">
+        </td>
+    </tr>
+    <tr>
+        <td>Distance: </td>
+        <td><input class="bind" type="range" object="RADIUS" transition="2" pow="3" step="any" min=7000 max=500000></td>
+    </tr>
+    <tr>
+        <td>Speed: </td>
+        <td><input class="bind" type="range" object="speed" transition="1.3" pow="4" step="any" min=1 max=1000></td>
+    </tr>
+    <tr>
+        <td>Time Cost: </td>
+        <td><input class="bind" type="range" object="timeCost" transition="0.7" pow="1" step="any" min=-2 max=2></td>
+    </tr>
+    <tr>
+        <td>Fractal Delay: </td>
+        <td><input class="bind" type="range" object="fractalDelay" transition="0.3" pow="9" step="any" min=0.1 max=1000></td>
+    </tr>
+    <tr>
+        <td>Array Choosing: </td>
+        <td><input id="arrChooseRange" class="bind" type="range" object="arrChoose" transition="0.7" step="any" min=0 max=1></td>
+    </tr>
+    <tr>
+        <td>AC Transition: </td>
+        <td><input class="bind" type="range" object="arrChooseRange.single.transition" transition="0.7" step="any" min=0 max=2></td>
+    </tr>
+</table>
+<br><br><br><br>
+
+<script src="../bind.js"></script>
+<script src="../actx.js"></script>
+<script src="camera.js"></script>
+<script src="main.js"></script>

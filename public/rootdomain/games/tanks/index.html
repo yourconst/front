@@ -1,0 +1,95 @@
+<html>
+    <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-status-bar-style" content="black">
+        
+        <link rel="stylesheet" href="menuButton.css">
+        <link rel="stylesheet" href="input.css">
+        <link rel="stylesheet" href="style.css">
+    </head>
+    <body>
+        <div id="menuContainer">
+            <div class="page" pageName="main">
+                <table>
+                        <tr><td><g onclick="gui.play = true">Play</g></td></tr>
+                        <tr><td><g onclick="die()">Die</g></td></tr>
+                        <tr><td><g class="pageLink" pageName="settings">Settings</g></td></tr>
+                        <tr><td><g class="pageLink" pageName="statistic">Statistic</g></td></tr>
+                </table>
+            </div>
+            <div class="page" pageName="settings">
+                    <table>
+                            <tr><td><g class="pageLink" pageName="image">Image</g></td></tr>
+                            <tr class="mobileOnly"><td><g class="pageLink" pageName="appearance">Appearance</g></td></tr>
+                            <tr><td><g class="backLink">Back</g></td></tr>
+                    </table>
+            </div>
+            <div class="page" pageName="appearance">
+                <table>
+                    <tr>
+                        <td>Joystick Size:</td>
+                    </tr>
+                    <tr><td colspan="2"><input class="bind" type="range" transition="0.3" object="layer.joyRadius" min="30" max="100" step="any" /></td></tr>
+                    <tr>
+                        <td>Joystick Visibility:</td>
+                    </tr>
+                    <tr><td colspan="2"><input class="bind" type="range" transition="0.3" object="layer.joyAlpha" min="0.03" max="0.6" step="any" /></td></tr>
+                    <tr>
+                        <td>Scale on Screen:</td>
+                        <td>
+                            <input class="bind" type="checkbox" id="scosc" group="scosc" object="mobileScale.visible" />
+                            <label for="scosc"></label>
+                        </td>
+                    </tr>
+                    <tr><td><g class="backLink">Back</g></td></tr>
+                </table>
+            </div>
+            <div class="page" pageName="image">
+                <table>
+                    <tr>
+                        <td>Resolution:</td>
+                        <td><input class="bind" type="number" group="resolution" change="checkDraw" object="layer.resolution" transition="0.3" min="0.33" max="2" step="any" /></td>
+                    </tr>
+                    <tr><td colspan="2"><input class="bind" type="range" group="resolution" change="checkDraw" pow="3" min="0.33" max="2" step="any" /></td></tr>
+                    <tr>
+                        <td>Image scale:</td>
+                        <td><input class="bind" type="number" group="imgscale" change="checkDraw" object="layer.scale" transition="0.3" min="0.07" max="1" step="any" /></td>
+                    </tr>
+                    <tr><td colspan="2"><input class="bind" type="range" group="imgscale" change="checkDraw" pow="3" min="0.07" max="1" step="any" /></td></tr>
+                    <tr>
+                        <td>Dynamic Light:</td>
+                        <td>
+                            <input class="bind" type="checkbox" id="dlight" group="dlight" change="checkDraw" object="layer.dynamicLight" />
+                            <label for="dlight"></label>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Shadows:</td>
+                        <td>
+                            <input class="bind" type="checkbox" id="shadows" change="checkDraw" object="layer.shadows" />
+                            <label for="shadows"></label>
+                        </td>
+                    </tr>
+                    <tr><td><g class="backLink">Back</g></td></tr>
+                </table>
+            </div>
+            <div class="page" pageName="statistic">
+                <table>
+                    <tr><td><g onclick="sendStatistic()">Send</g></td></tr>
+                    <tr><td><g class="pageLink" pageName="main">Back</g></td></tr>
+                </table>
+            </div>
+        </div>
+        <div id="mobileScale" class="mobileOnly">
+            <input class="bind" type="range" group="imgscale" pow="3" min="0.07" max="1" step="any" />
+        </div>
+        <table id="infoContainer">
+            <tr><td valign="bottom"><div id="livesRange"></div></td></tr>
+            <tr><td valign="bottom"><div id="fuelRange"></div></td></tr>
+            <tr><td align="center"><font id="bulletsNumber"></font> / <font id="maxBulletsNumber"></font></td></tr>
+        </table>
+        <menubtn></menubtn>
+        <script src="index.build.js"></script>
+    </body>
+</html>

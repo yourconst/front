@@ -1,0 +1,22 @@
+<div id="div"></div>
+<script src="audioAux.js"></script>
+<script>
+    let aa, id = 1;
+
+    window.onload = e => {
+        aa = new AudioAux;
+
+        aa.onplaychange = e => aa.setInfo(id, "play/pause");
+        aa.onnext = e => aa.setInfo(++id, "next");
+        aa.onprevious = e => aa.setInfo(--id, "previous");
+
+        aa._audio.controls = true;
+    };
+
+    window.onclick = e => {
+        if(aa.firstTime) {
+            aa._audio.play();
+            window.onclick = undefined;
+        }
+    };
+</script>

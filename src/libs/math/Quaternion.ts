@@ -1,3 +1,4 @@
+import { Vector2 } from "./Vector2";
 import { Vector3 } from "./Vector3";
 
 // TODO
@@ -7,7 +8,7 @@ export class Quaternion {
         const cos = Math.cos(angle);
         const sin = Math.sin(angle);
 
-        return new Quaternion(v.multiplyN(sin), cos);
+        return new Quaternion(v.multiplyN(sin), /* v.length() *  */cos);
     }
 
     static createRotationFromDirectionAngle(v: Vector3, angle: number) {
@@ -27,7 +28,7 @@ export class Quaternion {
     constructor(public i = new Vector3, public r = 1) { }
 
     clone() {
-        return new Quaternion(this.i, this.r);
+        return new Quaternion(this.i.clone(), this.r);
     }
 
     set(q: Quaternion) {
@@ -158,11 +159,42 @@ export class Quaternion {
         return new Vector3(this.angleX(), this.angleY(), this.angleZ());
     }
 
+    angleDirection() {
+        return 2 * Math.atan2(this.i.length(), this.r);
+    }
+
     direction() {
-        return this.i.clone().divideN(Math.sin(this.angleZ() / 2));
+        // return this.i.clone().divideN(Math.sin(this.angleDirection() / 2));
+        return new Vector3(
+            2 * (this.i.x * this.i.z - this.r * this.i.y),
+            2 * (this.i.y * this.i.z + this.r * this.i.x),
+            1 - 2 * (this.i.x * this.i.x + this.i.y * this.i.y),
+        );
+        // return this.i.clone().divideN(this.i.length());
+    }
+
+    setDirection(d: Vector3) {
+        // const angle = /* (this.angleDirection() / 2) ||  */(globalThis['QAD']/*  / 2 */);
+        // const cos = Math.cos(angle);
+        // const sin = Math.sin(angle);
+        // this.r = cos;
+        // this.i.set(d).normalize().multiplyN(sin);
+
+        // console.log(d, this.direction());
+
+        const z = Math.sqrt(d.xy.length2() / (2 * (1 - d.z)));
+        this.i.setN(
+            d.x / (2 * z),
+            d.y / (2 * z),
+            z,
+        );
+        this.r = 0;
+
+        return this;
     }
 }
 
+globalThis['QAD'] = Math.PI / 2;
 globalThis['Quaternion'] = Quaternion;
 
 /* 

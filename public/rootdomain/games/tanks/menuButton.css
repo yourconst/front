@@ -1,0 +1,59 @@
+menubtn {
+    position: fixed;
+    left: 0px;
+    top: 0px;
+
+    margin: 0;
+    padding: 0;
+
+    z-index: 10;
+
+    width: 60px;
+    height: 60px;
+
+    border-radius: 100%;
+}
+
+menubtn::before {
+    content: '';
+    display: block;
+    transition: 0.3s;
+    position: absolute;
+    left: 15px;
+    top: 15px;
+    width: 30px;
+    height: 4px;
+    background: white;
+    border-radius: 3px;
+    box-shadow: 0px 0px 7px rgb(83, 83, 83);
+    transform-origin: center left;
+    transform: rotateZ(0deg);
+}
+
+menubtn::after {
+    content: '';
+    display: block;
+    transition: 0.3s;
+    position: absolute;
+    left: 15px;
+    top: 36.213px;
+    width: 30px;
+    height: 4px;
+    background: white;
+    border-radius: 3px;
+    box-shadow: 0px 0px 7px rgb(83, 83, 83);
+    transform-origin: center left;
+    transform: rotateZ(0deg);
+}
+
+/* menubtn:hover::before, menubtn:hover::after {
+    background: rgb(100, 184, 212);
+} */
+
+menubtn.enable::before {
+    transform: rotateZ(45deg);
+}
+
+menubtn.enable::after {
+    transform: rotateZ(-45deg);
+}

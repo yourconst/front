@@ -88,4 +88,9 @@ export class Rotation3Matrix implements IRotation3 {
     rightDirection() {
         return this.getAbsoluteVector(new Vector3(1, 0, 0));
     }
+
+    setDirection(d: Vector3) {
+        // TODO
+        return this;
+    }
 }

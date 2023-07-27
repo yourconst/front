@@ -189,10 +189,9 @@ export abstract class Geometry3 {
 
 
 
-    // TODO: fix
     getRelativeDirection(ad: Vector3) {
         // return ad.clone().rotateReverseZYX(this.angles);
-        return this.rotation.getAbsoluteVector(ad);
+        return this.rotation.getRelativeVector(ad);
     }
 
     getRelativePoint(ap: Vector3) {
@@ -204,10 +203,9 @@ export abstract class Geometry3 {
         );
     }
 
-    // TODO: fix
     getAbsoluteDirection(rd: Vector3) {
         // return rd.clone().rotateXYZ(this.angles);
-        return this.rotation.getRelativeVector(rd);
+        return this.rotation.getAbsoluteVector(rd);
     }
 
     getAbsolutePoint(rp: Vector3) {

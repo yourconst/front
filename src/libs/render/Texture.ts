@@ -17,7 +17,7 @@ function createCanvasWithData(options: {
     options.width ??= sqrt;
     options.height ??= sqrt;
     options.multiplier ??= 1;
-    const canvas = Helpers.createOffscreenCanvas(options.width, options.height);
+    const canvas = Helpers.Canvas.createOffscreen(options.width, options.height);
     const context = <CanvasRenderingContext2D> canvas.getContext('2d');
     const id = context.getImageData(0, 0, options.width, options.height);
 
@@ -139,6 +139,7 @@ export class Texture {
     
     // TODO: rejecting
     async load() {
+        // return this;
         if (this.loaded) {
             return this;
         }
@@ -156,6 +157,7 @@ export class Texture {
         if (typeof this.rawSource === 'string') {
             realRawSource = await new Promise<HTMLImageElement>((resolve, reject) => {
                 const img = new Image();
+                img.crossOrigin = 'Anonymous';
 
                 img.onload = () => resolve(img);
                 img.onerror = (error) => reject(error);
@@ -195,8 +197,9 @@ export class Texture {
             height = (height / factor) >> 0;
         }
 
-        this.canvas = Helpers.createOffscreenCanvas(width, height);
-        this.context2d = <any> this.canvas.getContext('2d');
+        this.canvas = Helpers.Canvas.createOffscreen(width, height);
+        this.context2d = <any>this.canvas.getContext('2d');
+        this.context2d.imageSmoothingEnabled = false;
         this.context2d.drawImage(realRawSource, 0, 0, width, height);
     
         this.updatedAt = performance.now();

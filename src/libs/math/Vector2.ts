@@ -12,6 +12,12 @@ export class Vector2 {
         );
     }
 
+    static Shell: typeof Vector2Shell;
+
+    // static createShell<T>(target: T, xprop: keyof T, yprop: keyof T) {
+    //     return new Vector2Shell(target, xprop, yprop);
+    // }
+
     constructor(public x = 0, public y = 0) { }
 
     clone() {
@@ -107,6 +113,14 @@ export class Vector2 {
         return this;
     }
 
+    length2() {
+        return this.x * this.x + this.y * this.y;
+    }
+
+    length() {
+        return Math.sqrt(this.length2());
+    }
+
     rotate(a = 0) {
         const { x, y } = this;
         const cos = Math.cos(a), sin = Math.sin(a);
@@ -121,3 +135,32 @@ export class Vector2 {
         return this.x * this.y;
     }
 }
+
+// export type KeysMatching<T extends object, V> = {
+//     [K in keyof T]-?: T[K] extends V ? K : never
+// }[keyof T];
+
+export class Vector2Shell<
+    T extends any,
+    ValidProps extends keyof T = keyof T
+    /* , ValidProps extends KeysMatching<T, number> = KeysMatching<T, number> */
+> extends Vector2 {
+    constructor(private readonly _target: T, private readonly _xprop: ValidProps, private readonly _yprop: ValidProps) {
+        // @ts-ignore
+        super(_target[_xprop], _target[_yprop]);
+    }
+
+    // @ts-ignore
+    get x() { return this._target?.[this._xprop]; }
+    // @ts-ignore
+    set x(v) { if (this._target) this._target[this._xprop] = v; }
+
+    // @ts-ignore
+    get y() { return this._target?.[this._yprop]; }
+    // @ts-ignore
+    set y(v) { if (this._target) this._target[this._yprop] = v; }
+}
+
+Vector2.Shell = Vector2Shell;
+
+globalThis['Vector2'] = Vector2;
