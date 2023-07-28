@@ -10,6 +10,7 @@ import { PeriodCountLimiterRunner } from './PeriodCountLimiterRunner';
 import { PlatformHelpers } from './Platform';
 import { CanvasHelpers } from './Canvas';
 import { Algorithms } from '../../libs/algorithms';
+import { ScreenHelpers } from './Screen';
 
 export abstract class Helpers {
     static readonly Base = BaseHelpers;
@@ -25,6 +26,7 @@ export abstract class Helpers {
     static readonly Platform = PlatformHelpers;
     static readonly Canvas = CanvasHelpers;
     static readonly Algorithms = Algorithms;
+    static readonly Screen = ScreenHelpers;
 
     static readonly sleep = BaseHelpers.sleep;
     static readonly rand = BaseHelpers.rand;
