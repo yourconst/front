@@ -16,7 +16,7 @@
     import type { IDrawableGeometry } from "../../libs/drawableGeometry/DrawableGeometry";
     import { ExposureCalculator } from "../../libs/render/ExposureCalculator";
     import { PathtracingProgram } from "../../projects/raytracing/shaders/pathtracing";
-    import * as TEXTURES from "../../projects/raytracing/textures/index";
+    import { TEXTURES } from "../../projects/raytracing/textures/index";
     import { CONSTANTS } from "../../projects/raytracing/configs/constants";
     import { DrawableCube } from "../../libs/drawableGeometry/DrawableCube";
     import { Renderer3dContext2d } from "../../libs/render/renderers/3d/Context2d";
@@ -24,6 +24,7 @@
   import { Matrix3x3 } from "../../libs/math/Matrix3x3";
   import { Range } from "../../libs/math/Range";
   import { Rotation3 } from "../../libs/math/rotattion/Rotation3";
+  import { MATERIALS } from "../../projects/raytracing/textures/materials";
 
     const NUF = new Helpers.NumberUnitFormatter([
         { name: 'm', value: CONSTANTS.DISTANCE.M, countToNext: CONSTANTS.DISTANCE.KM / CONSTANTS.DISTANCE.M },
@@ -50,8 +51,7 @@
             geometry: new /* DrawableSphere */DrawableCube({
                 center: new Vector3(0, 0, 0),
                 radius: 1,
-                color: new Vector3(0.5, 0.5, 0.5),
-                texture: Texture.create(TEXTURES.mars),
+                material: MATERIALS.mars,
             }),
         }),
     };
@@ -60,8 +60,7 @@
         geometry: new DrawableSphere({
             center: new Vector3(0, 100, 0),
             radius: 10,
-            color: new Vector3(1,1,1).multiplyN(1000000),
-            texture: Texture.create(TEXTURES.moon),
+            material: MATERIALS.sun,
         }),
     });
     const GROUND = new Body3({
@@ -73,8 +72,7 @@
         geometry: new DrawableSphere({
             center: new Vector3(0, 0, 0),
             radius: 80,
-            color: new Vector3(0.5, 0.5, 0.5),
-            texture: Texture.create(TEXTURES.earth),
+            material: MATERIALS.earth,
         }),
     });
 
@@ -299,7 +297,7 @@
     });
 
 
-    const _textures = Object.values({...TEXTURES, space: null}).filter(t => t);
+    const _materials = Object.values({...MATERIALS, space: null}).filter(t => t);
     function tryAddRandomRigid() {
         if (!state.hovered.object) {
             return;
@@ -312,21 +310,19 @@
 
         let geometry: IDrawableGeometry;
 
-        const texture = Texture.create(Helpers.randElement(_textures))
+        const material = Helpers.randElement(_materials);
         if (Math.random() > 0.5) {
             geometry = new DrawableSphere({
                 center,
                 radius: 1,
-                color: new Vector3(0.5, 0.5, 0.5),
-                texture,
+                material,
             });
         } else {
             geometry = new DrawableCube({
                 center,
                 // radius: 1,
                 sizes: Vector3.createRandom(0.3, 4),
-                color: new Vector3(0.5, 0.5, 0.5),
-                texture,
+                material,
             });
         }
 

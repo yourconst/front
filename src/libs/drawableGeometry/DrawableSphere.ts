@@ -7,21 +7,18 @@ export interface DrawableSphereOptions extends SphereOptions, IDrawableGeometryO
 }
 
 export class DrawableSphere extends Sphere implements IDrawableGeometry {
-    public color: IDrawableGeometry['color'];
-    public texture?: IDrawableGeometry['texture'];
+    public material: IDrawableGeometry['material'];
 
     constructor(options: DrawableSphereOptions) {
         super(options);
         
-        this.color = options.color;
-        this.texture = options.texture ?? null;
+        this.material = options.material ?? null;
     }
 
     _getCloneConfig() {
         return {
             ...super._getCloneConfig(),
-            color: this.color.clone(),
-            texture: this.texture,
+            material: this.material,
         };
     }
 

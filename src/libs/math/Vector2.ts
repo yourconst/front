@@ -20,8 +20,19 @@ export class Vector2 {
 
     constructor(public x = 0, public y = 0) { }
 
+    getArray() {
+        return <[number, number]>[this.x, this.y];
+    }
+
     clone() {
         return new Vector2(this.x, this.y);
+    }
+    
+    setXIfNull(x = 1) {
+        if (this.x === 0 && this.y === 0) {
+            this.x = x;
+        }
+        return this;
     }
 
     isEquals(v: Vector2) {
@@ -39,6 +50,42 @@ export class Vector2 {
         };
     }
 
+    maxComponent() {
+        return Math.max(this.x, this.y);
+    }
+
+    minComponent() {
+        return Math.min(this.x, this.y);
+    }
+
+    maxSet(v: Vector2) {
+        this.x = Math.max(this.x, v.x);
+        this.y = Math.max(this.y, v.y);
+
+        return this;
+    }
+
+    minSet(v: Vector2) {
+        this.x = Math.min(this.x, v.x);
+        this.y = Math.min(this.y, v.y);
+
+        return this;
+    }
+
+    maxSetN(x: number, y: number) {
+        this.x = Math.max(this.x, x);
+        this.y = Math.max(this.y, y);
+
+        return this;
+    }
+
+    minSetN(x: number, y: number) {
+        this.x = Math.min(this.x, x);
+        this.y = Math.min(this.y, y);
+
+        return this;
+    }
+
     set(v: Vector2) {
         this.x = v.x;
         this.y = v.y;
@@ -48,6 +95,12 @@ export class Vector2 {
     setN(x = this.x, y = this.y) {
         this.x = x;
         this.y = y;
+        return this;
+    }
+
+    setByAngle(a: number, r = 1) {
+        this.x = Math.cos(a) * r;
+        this.y = Math.sin(a) * r;
         return this;
     }
 
@@ -121,6 +174,18 @@ export class Vector2 {
         return Math.sqrt(this.length2());
     }
 
+    normalize(r = 1) {
+        return this.multiplyN(r / (this.length() || 1));
+    }
+
+    distance2To(v: Vector2) {
+        return this.clone().minus(v).length2();
+    }
+
+    distanceTo(v: Vector2) {
+        return this.clone().minus(v).length();
+    }
+
     rotate(a = 0) {
         const { x, y } = this;
         const cos = Math.cos(a), sin = Math.sin(a);
@@ -129,6 +194,20 @@ export class Vector2 {
         this.y = x * sin + y * cos;
 
         return this;
+    }
+
+    rotateBySC(sc: Vector2, sign = 1) {
+        const { x, y } = this;
+        const cos = sc.x, sin = sign * sc.y;
+
+        this.x = x * cos - y * sin;
+        this.y = x * sin + y * cos;
+
+        return this;
+    }
+
+    getAngle() {
+        return Math.atan2(this.y, this.x);
     }
 
     rectSquare() {

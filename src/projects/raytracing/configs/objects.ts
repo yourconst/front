@@ -1,9 +1,9 @@
 import { Helpers } from "../../../helpers/common";
 import { DrawableSphere } from "../../../libs/drawableGeometry/DrawableSphere";
 import { Vector3 } from "../../../libs/math/Vector3";
-import { Texture } from "../../../libs/render/Texture";
 import { Planet } from "../physics/Planet";
-import * as TEXTURES from '../textures';
+import type * as TEXTURES from '../textures';
+import { MATERIALS } from "../textures/materials";
 
 interface SpaceObject {
     name: TEXTURES.TextureName;
@@ -59,10 +59,9 @@ for (const star of CONFIG.stars) {
         orbitRadius: star.orbitRadius,
         body: new Planet({
             geometry: new DrawableSphere({
-                texture: Texture.create(TEXTURES[star.name]),
+                material: MATERIALS[star.name],
                 center: star.center,
                 radius: star.radius,
-                color: star.color ?? new Vector3(1, 1, 1).multiplyN(1e23),
             }),
             mass: star.mass,
             velocity: star.velocity,
@@ -79,10 +78,9 @@ for (const planet of CONFIG.planets) {
         orbitRadius: planet.orbitRadius,
         body: new Planet({
             geometry: new DrawableSphere({
-                texture: Texture.create(TEXTURES[planet.name]),
+                material: MATERIALS[planet.name],
                 center: planet.center || new Vector3(0, 0, 1),
                 radius: planet.radius,
-                color: planet.color ?? new Vector3(1, 1, 1),
             }),
             mass: planet.mass,
             velocity: planet.velocity,

@@ -5,10 +5,6 @@ import { Vector3 } from "../../../../libs/math/Vector3";
 import type { Camera3 } from "../../../../libs/render/Camera3";
 import { Texture } from "../../../../libs/render/Texture";
 import { WebGLStructFiller } from "../StructFiller";
-import * as TEXTURES from '../../textures/index';
-
-const textureNormal = Texture.create(TEXTURES.earthNormalMap);
-const textureSpecular = Texture.create(TEXTURES.earthSpecularMap);
 
 export class Filler extends WebGLStructFiller {
     static readonly sizes = {
@@ -30,13 +26,14 @@ export class Filler extends WebGLStructFiller {
     static specularity = new Vector3(1, 1, 1);
     static transparency = new Vector3(0, 0, 0);
     static Material(ut: Gl2Utils, g: IDrawableGeometry, f32a: Float32Array, offset = 0, i32a: Int32Array) {
-        this.Vector3(g.color, f32a, offset + 0);
-        i32a[offset + 3] = ut.getFrameTextureIndex(g.texture);
-        const isEarth = typeof g.texture?.rawSource === 'string' && g.texture?.rawSource.includes('earth');
-        this.Vector3(new Vector3(0,1,0), f32a, offset + 4);
-        i32a[offset + 7] = isEarth ? ut.getFrameTextureIndex(textureNormal) : i32a[offset + 3];
+        const m = g.material;
+        this.Vector3(m.color.rgb, f32a, offset + 0);
+        i32a[offset + 3] = ut.getFrameTextureIndex(m.texture);
+        this.Vector3(new Vector3(0, 1, 0), f32a, offset + 4);
+        const nm = ut.getFrameTextureIndex(m.normalMap);
+        i32a[offset + 7] = nm === -1 ? i32a[offset + 3] : nm;
         this.Vector3(this.specularity, f32a, offset + 8);
-        i32a[offset + 11] = isEarth ? ut.getFrameTextureIndex(textureSpecular) : -1;
+        i32a[offset + 11] = ut.getFrameTextureIndex(m.reflectance);
         this.Vector3(this.transparency, f32a, offset + 12);
         i32a[offset + 15] = -1;
 

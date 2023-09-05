@@ -26,7 +26,7 @@ type TextureSource = string | Texture;
 export interface TextureConfig {
     index?: number;
     readonly source: TextureSource;
-    sourceUpdatedAt: number;
+    loadedHash: number;
     readonly mipMap: boolean;
     readonly type: number;
     readonly texture: WebGLTexture;
@@ -210,7 +210,7 @@ export class Gl2Utils {
 
         const config: TextureConfig = {
             source: Math.random().toString(16).slice(2),
-            sourceUpdatedAt: null,
+            loadedHash: null,
             type,
             texture,
             level: 0,
@@ -248,7 +248,7 @@ export class Gl2Utils {
 
             config = {
                 source,
-                sourceUpdatedAt: 0,
+                loadedHash: -1,
                 type: this.gl.TEXTURE_2D,
                 texture,
                 level: 0,
@@ -260,6 +260,11 @@ export class Gl2Utils {
             };
 
             this.textures.set(config.source, config);
+
+            this.updateTexture(config, {
+                data: new Uint8Array([128, 128, 128, 255]),
+                width: 1, height: 1,
+            });
         }
 
         if (!(config.source instanceof Texture)) {
@@ -270,12 +275,8 @@ export class Gl2Utils {
             config.source.load();
         }
 
-        if (config.sourceUpdatedAt !== +config.source.loaded) {
-            // const startTime = Date.now();
-
-            console.log('Load', config.source.rawSource);
-
-            config.sourceUpdatedAt = +config.source.loaded;
+        if (config.loadedHash !== config.source.hash) {
+            config.loadedHash = config.source.hash;
             this.gl.bindTexture(config.type, config.texture);
             this.gl.texImage2D(
                 config.type,
@@ -298,6 +299,8 @@ export class Gl2Utils {
                 // glTexParameterf(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_WRAP_T, GL_CLAMP);
             }
             this.gl.bindTexture(config.type, null);
+
+            console.log('Load', config.source.rawSource);
         }
 
         return config;

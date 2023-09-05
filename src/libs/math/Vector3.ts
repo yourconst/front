@@ -30,6 +30,10 @@ export class Vector3 {
     get zy() { return (this._zy ??= new Vector2.Shell(this, 'z', 'y')); }
     //#endregion ACCESSORS
 
+    getArray() {
+        return <[number, number, number]>[this.x, this.y, this.z];
+    }
+
     clone() {
         return new Vector3(this.x, this.y, this.z);
     }

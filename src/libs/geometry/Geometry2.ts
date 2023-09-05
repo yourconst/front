@@ -1,64 +1,64 @@
-import type { AABB3 } from "../math/AABB3";
-import type { Vector3 } from "../math/Vector3";
-import { Ray3 } from "../math/Ray3";
-import type { IRotation3 } from "../math/rotattion/IRotation3";
-import { Rotation3 } from "../math/rotattion/Rotation3";
+import type { AABB2 } from "../math/AABB2";
+import type { Vector2 } from "../math/Vector2";
+import { Ray2 } from "../math/Ray2";
+import type { IRotation2 } from "../math/rotattion/IRotation2";
+import { Rotation2 } from "../math/rotattion/Rotation2";
 
-export interface Collision {
+export interface Collision2 {
     isCollided: boolean;
     depth?: number;
-    point?: Vector3;
-    normal?: Vector3;
+    point?: Vector2;
+    normal?: Vector2;
 }
 
-export interface Geometry3Options {
-    center: Vector3;
+export interface Geometry2Options {
+    center: Vector2;
     radius?: number;
-    volume?: number;
-    aabb?: AABB3;
-    rotation?: IRotation3;
+    square?: number;
+    aabb?: AABB2;
+    rotation?: IRotation2;
 }
 
-export abstract class Geometry3 {
-    center: Vector3;
+export abstract class Geometry2 {
+    center: Vector2;
     radius?: number;
-    volume?: number;
-    aabb?: AABB3;
-    rotation: IRotation3;
+    square?: number;
+    aabb?: AABB2;
+    rotation: IRotation2;
 
-    constructor(options: Geometry3Options) {
+    constructor(options: Geometry2Options) {
         this.center = options.center;
         this.radius = options.radius;
-        this.volume = options.volume;
+        this.square = options.square;
         this.aabb = options.aabb;
-        this.rotation = options.rotation ?? Rotation3.Quaternion.createNXYZ(0, 0, 0);
+        this.rotation = options.rotation ?? Rotation2.Euler.create();
     }
 
-    _getCloneConfig(): Geometry3Options {
+    _getCloneConfig(): Geometry2Options {
         return {
             center: this.center.clone(),
             radius: this.radius,
-            volume: this.volume,
+            square: this.square,
             aabb: this.aabb,
             rotation: this.rotation.clone(),
         };
     }
 
-    abstract clone(): Geometry3;
+    abstract clone(): Geometry2;
 
-    abstract getRayDistance(ray: Ray3): number;
+    abstract getRayDistance(ray: Ray2): number;
     
     calcRadius() {
         return this.radius;
     };
-    abstract calcAABB(): AABB3;
-    abstract calcVolume(): number;
+    abstract calcAABB(): AABB2;
+    abstract calcSquare(): number;
 
-    getRadiusVectorByCentresTo(geometry: Geometry3) {
+    getRadiusVectorByCentresTo(geometry: Geometry2) {
         return geometry.center.clone().minus(this.center);
     }
 
-    getClosestPointToPoint(p: Vector3) {
+    getClosestPointToPoint(p: Vector2) {
         const to = p.clone().minus(this.center);
         const tol = to.length();
 
@@ -69,22 +69,22 @@ export abstract class Geometry3 {
         return to.multiplyN(this.getRadius() / tol).plus(this.center);
     }
 
-    getClosestSurfacePointToPoint(p: Vector3) {
+    getClosestSurfacePointToPoint(p: Vector2) {
         const to = p.clone().minus(this.center).setXIfNull();
         let tol = to.length();
 
         return to.multiplyN(this.getRadius() / tol).plus(this.center);
     }
 
-    getNormalToPoint(p: Vector3) {
+    getNormalToPoint(p: Vector2) {
         return p.clone().minus(this.center).normalize();
     }
 
-    getSignedDistanceTo(geometry: Geometry3) {
+    getSignedDistanceTo(geometry: Geometry2) {
         return this.center.distanceTo(geometry.center) - this.getRadius() - geometry.getRadius();
     }
 
-    getCollisionPointInfo(geometry: Geometry3) {
+    getCollisionPointInfo(geometry: Geometry2) {
         const depth = this.getSignedDistanceTo(geometry);
 
         if (depth > 0) {
@@ -103,12 +103,12 @@ export abstract class Geometry3 {
         };
     }
 
-    getCollision(geometry: Geometry3): Collision {
+    getCollision(geometry: Geometry2): Collision2 {
         let mult = 1;
-        let max: Geometry3 = this;
-        let min: Geometry3 = geometry;
+        let max: Geometry2 = this;
+        let min: Geometry2 = geometry;
 
-        if (max['sizes'] || max.getVolume() < min.getVolume()) {
+        if (max['sizes'] || max.getSquare() < min.getSquare()) {
             mult = -1;
             max = geometry;
             min = this;
@@ -128,20 +128,8 @@ export abstract class Geometry3 {
             isCollided: true,
             depth: op.distanceTo(tp),
             point,
-            // normal: op.clone().minus(tp).normalize().multiplyN(mult),
             normal: max.getNormalToPoint(tp).multiplyN(-mult),
         };
-
-        // const info = this.getCollisionPointInfo(geometry);
-
-        // if (!info.isCollided) {
-        //     return info;
-        // }
-
-        // return {
-        //     ...info,
-        //     normal: this.getNormalToPoint(info.point),
-        // };
     }
 
     getRadius() {
@@ -168,26 +156,26 @@ export abstract class Geometry3 {
         return this.aabb;
     }
 
-    getVolume() {
-        if (typeof this.volume !== 'number') {
-            this.volume = this.calcVolume();
+    getSquare() {
+        if (typeof this.square !== 'number') {
+            this.square = this.calcSquare();
         }
 
-        return this.volume;
+        return this.square;
     }
-    recalcVolume() {
-        this.volume = this.calcVolume();
-        return this.volume;
+    recalcSquare() {
+        this.square = this.calcSquare();
+        return this.square;
     }
 
 
 
-    getRelativeDirection(ad: Vector3) {
+    getRelativeDirection(ad: Vector2) {
         // return ad.clone().rotateReverseZYX(this.angles);
         return this.rotation.getRelativeVector(ad);
     }
 
-    getRelativePoint(ap: Vector3) {
+    getRelativePoint(ap: Vector2) {
         // return ap.clone()
         //     .minus(this.center)
         //     .rotateReverseZYX(this.angles);
@@ -196,27 +184,27 @@ export abstract class Geometry3 {
         );
     }
 
-    getAbsoluteDirection(rd: Vector3) {
+    getAbsoluteDirection(rd: Vector2) {
         // return rd.clone().rotateXYZ(this.angles);
         return this.rotation.getAbsoluteVector(rd);
     }
 
-    getAbsolutePoint(rp: Vector3) {
+    getAbsolutePoint(rp: Vector2) {
         // return rp.clone()
         //     .rotateXYZ(this.angles)
         //     .plus(this.center);
         return this.getAbsoluteDirection(rp).plus(this.center);
     }
 
-    getRelativeRay(ar: Ray3) {
-        return new Ray3(
+    getRelativeRay(ar: Ray2) {
+        return new Ray2(
             this.getRelativePoint(ar.origin),
             this.getRelativeDirection(ar.direction),
         )
     }
 
-    getAbsoluteRay(rr: Ray3) {
-        return new Ray3(
+    getAbsoluteRay(rr: Ray2) {
+        return new Ray2(
             this.getAbsolutePoint(rr.origin),
             this.getAbsoluteDirection(rr.direction),
         )

@@ -64,20 +64,8 @@ export class Vector4 {
     // TODO
     //#endregion ACCESSORS
 
-    clone() {
-        return new Vector4(this.x, this.y, this.z, this.w);
-    }
-
-    getXYZ() {
-        return new Vector3(this.x, this.y, this.z);
-    }
-
-    isEquals(v: Vector4) {
-        return this.x === v.x && this.y === v.y && this.z === v.z && this.z === v.w;
-    }
-
-    isEqualsN(x = this.x, y = this.y, z = this.z, w = this.w) {
-        return (this.x === x) && (this.y === y) && (this.z === z) && (this.w === w);
+    getArray() {
+        return <[number, number, number, number]>[this.x, this.y, this.z, this.w];
     }
 
     getNormBytes(max = 1.0) {
@@ -96,6 +84,22 @@ export class Vector4 {
             this.z / max,
             this.w / max,
         ]);
+    }
+
+    clone() {
+        return new Vector4(this.x, this.y, this.z, this.w);
+    }
+
+    getXYZ() {
+        return new Vector3(this.x, this.y, this.z);
+    }
+
+    isEquals(v: Vector4) {
+        return this.x === v.x && this.y === v.y && this.z === v.z && this.z === v.w;
+    }
+
+    isEqualsN(x = this.x, y = this.y, z = this.z, w = this.w) {
+        return (this.x === x) && (this.y === y) && (this.z === z) && (this.w === w);
     }
 
     set(v: Vector4) {
@@ -133,6 +137,15 @@ export class Vector4 {
         return this;
     }
 
+    divideN(n: number) {
+        this.x /= n;
+        this.y /= n;
+        this.z /= n;
+        this.w /= n;
+
+        return this;
+    }
+
     normalize(r = 1) {
         return this.multiplyN(r / (this.length() || 1));
     }
@@ -153,13 +166,5 @@ export class Vector4 {
         this.w += w;
 
         return this;
-    }
-
-    toRGB(multiplier = 255) {
-        return `rgb(${multiplier * this.x}, ${multiplier * this.y}, ${multiplier * this.z})`;
-    }
-
-    toRGBA(multiplier = 255) {
-        return `rgb(${multiplier * this.x}, ${multiplier * this.y}, ${multiplier * this.z}, ${this.w})`;
     }
 }

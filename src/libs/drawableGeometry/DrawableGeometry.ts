@@ -1,10 +1,8 @@
 import type { Geometry3 } from "../geometry/Geometry3";
-import type { Vector3 } from "../math/Vector3";
-import type { Texture } from "../render/Texture";
+import type { Material } from "../material/Material";
 
 export interface IDrawableGeometryOptions {
-    color: Vector3;
-    texture?: Texture;
+    material: Material;
 }
 
 export interface IDrawableGeometry extends Geometry3, IDrawableGeometryOptions {

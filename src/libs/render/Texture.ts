@@ -1,4 +1,5 @@
 import { Helpers } from "../../helpers/common";
+import type { ImageDataLike } from "../../helpers/common/Canvas";
 import type { Vector2 } from "../math/Vector2";
 import { Vector4 } from "../math/Vector4";
 
@@ -6,36 +7,8 @@ export type RealRawTextureSource = HTMLImageElement | HTMLCanvasElement | Offscr
 
 export type RawTextureSource = string | RealRawTextureSource;
 
-function createCanvasWithData(options: {
-    data: ArrayLike<number>;
-    width?: number;
-    height?: number;
-    multiplier?: number;
-}) {
-    const sqrt = Math.sqrt(options.data.length >> 2) >> 0;
-
-    options.width ??= sqrt;
-    options.height ??= sqrt;
-    options.multiplier ??= 1;
-    const canvas = Helpers.Canvas.createOffscreen(options.width, options.height);
-    const context = <CanvasRenderingContext2D> canvas.getContext('2d');
-    const id = context.getImageData(0, 0, options.width, options.height);
-
-    for (let i = 0; i < (options.width * options.height) << 2; ++i) {
-        id.data[i] = options.data[i] * options.multiplier;
-    }
-
-    context.putImageData(id, 0, 0);
-
-    return { canvas, context };
-}
-
 export interface TextureOptions {
-    base?: {
-        data: ArrayLike<number>;
-        width?: number;
-        height?: number;
-    };
+    base?: ImageDataLike;
     maxWidth?: number;
     maxHeight?: number;
 }
@@ -50,7 +23,7 @@ export class Texture {
     private static broadcastedSimpleTexure?: Texture;
     static broadcastSimpleTexture() {
         const sz = 4;
-        const data = new Uint8Array(sz * sz);
+        const data = new Uint8ClampedArray(sz * sz);
 
         for (let i = 0; i < sz * sz; ++i) {
             const other = (i % 2) ^ ((i / sz) >> 0) % 2;
@@ -60,7 +33,7 @@ export class Texture {
             data[4 * i + 3] = 255;
         }
 
-        const { canvas } = createCanvasWithData({ data });
+        const { canvas } = Helpers.Canvas.createWithData({ data, width: sz, height: sz });
 
         this.broadcastedSimpleTexure = this.create(canvas);
         return this;
@@ -91,7 +64,7 @@ export class Texture {
     maxWidth?: number;
     maxHeight?: number;
     
-    updatedAt = performance.now();
+    hash = Math.random();
 
     private constructor(public readonly rawSource: RawTextureSource, options: TextureOptions = {}) {
         if (!(
@@ -106,12 +79,9 @@ export class Texture {
         this.maxWidth = options.maxWidth;
         this.maxHeight = options.maxHeight;
         
-        const base = createCanvasWithData({
-            data: options.base?.data || [0.5, 0.5, 0.5, 1.0],
-            width: options.base?.width,
-            height: options.base?.height,
-            multiplier: 255,
-        });
+        const base = Helpers.Canvas.createWithData(
+            options.base ?? { data: [0.5, 0.5, 0.5, 1], float: true },
+        );
 
         this.canvas = base.canvas;
         this.context2d = base.context;
@@ -202,10 +172,11 @@ export class Texture {
         this.context2d.imageSmoothingEnabled = false;
         this.context2d.drawImage(realRawSource, 0, 0, width, height);
     
-        this.updatedAt = performance.now();
+        this.hash = Math.random();
 
         const { _loadingPromise } = this;
         this._loadingPromise = null;
+        _loadingPromise.resolve(this);
         return _loadingPromise.promise;
     }
 

@@ -22,13 +22,14 @@ export class Filler extends WebGLStructFiller {
     static cubesAsSpheres = false;
 
     static DrawableGeometry(ut: Gl2Utils, g: IDrawableGeometry, f32a: Float32Array, offset = 0, i32a: Int32Array, relativeTo?: Vector3) {
+        const m = g.material;
         const isCube = g instanceof DrawableCube && !this.cubesAsSpheres;
 
         this.Vector3(g.center, f32a, offset + 0, relativeTo);
         f32a[offset + 3] = isCube ? 1 : 0;
         this.Vector3(isCube ? g.sizes : new Vector3(g.radius, 1.3 * g.radius, 1 / g.radius), f32a, offset + 4);
-        i32a[offset + 7] = ut.getTextureIndex(g.texture);
-        this.Vector3(g.color, f32a, offset + 8);
+        i32a[offset + 7] = ut.getTextureIndex(m.texture);
+        this.Vector3(m.color.rgb, f32a, offset + 8);
 
         this.Matrix3x3(
             g.rotation.matrix(),

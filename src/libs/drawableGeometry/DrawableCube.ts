@@ -12,14 +12,13 @@ export class DrawableCube extends Cube implements IDrawableGeometry {
         p1: Vector3;
         width?: number;
     }) {
-        const { p0, p1, width, color, texture } = options;
+        const { p0, p1, width, material } = options;
         const center = p0.clone().plus(p1).multiplyN(0.5);
         const r = center.distanceTo(p0);
 
         const result = new DrawableCube({
             center,
-            color,
-            texture,
+            material,
             sizes: new Vector3(width, width, r),
             radius: r,
         });
@@ -29,21 +28,18 @@ export class DrawableCube extends Cube implements IDrawableGeometry {
         return result;
     }
 
-    public color: IDrawableGeometry['color'];
-    public texture?: IDrawableGeometry['texture'];
+    public material: IDrawableGeometry['material'];
 
     constructor(options: DrawableCubeOptions) {
         super(options);
         
-        this.color = options.color;
-        this.texture = options.texture ?? null;
+        this.material = options.material ?? null;
     }
 
     _getCloneConfig() {
         return {
             ...super._getCloneConfig(),
-            color: this.color.clone(),
-            textureName: this.texture,
+            material: this.material,
         };
     }
 
