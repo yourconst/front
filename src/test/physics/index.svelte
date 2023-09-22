@@ -25,6 +25,10 @@
   import { Range } from "../../libs/math/Range";
   import { Rotation3 } from "../../libs/math/rotattion/Rotation3";
   import { MATERIALS } from "../../projects/raytracing/textures/materials";
+  import { Material } from "../../libs/material/Material";
+  import { Color } from "../../libs/material/Color";
+  import { Vector4 } from "../../libs/math/Vector4";
+  import { CustomLaw } from "../../projects/raytracing/components/customLaws";
 
     const NUF = new Helpers.NumberUnitFormatter([
         { name: 'm', value: CONSTANTS.DISTANCE.M, countToNext: CONSTANTS.DISTANCE.KM / CONSTANTS.DISTANCE.M },
@@ -48,7 +52,7 @@
             distance: 1e15,
         }),
         body: new RigidBody3({
-            geometry: new /* DrawableSphere */DrawableCube({
+            geometry: new DrawableSphere/* DrawableCube */({
                 center: new Vector3(0, 0, 0),
                 radius: 1,
                 material: MATERIALS.mars,
@@ -58,8 +62,8 @@
 
     const LIGHT = new Body3({
         geometry: new DrawableSphere({
-            center: new Vector3(0, 100, 0),
-            radius: 10,
+            center: new Vector3(0, 10000, 0),
+            radius: 1000,
             material: MATERIALS.sun,
         }),
     });
@@ -69,14 +73,15 @@
         //     radius: 5000,
         //     color: new Vector3(0.5, 0.5, 0.5),
         // }),
-        geometry: new DrawableSphere({
+        geometry: new /* DrawableSphere */DrawableCube({
             center: new Vector3(0, 0, 0),
             radius: 80,
+            sizes: new Vector3(80, 80, 80),
             material: MATERIALS.earth,
         }),
     });
 
-    GROUND.geometry.rotation.setNXYZ(-Math.PI / 3, Math.PI, 0);
+    // GROUND.geometry.rotation.setNXYZ(-Math.PI / 3, Math.PI, 0);
 
     let onFrame: () => number;
     let canvas3d: HTMLCanvasElement;
@@ -121,10 +126,12 @@
         lookAtPoint: <Vector3> null,
     };
 
-    state.camera.ambient = 0.01;
+    state.camera.ambient = 0.00;
     state.camera.exposure = 4;
     state.camera.pathtracing.depth = 10;
     state.camera.pathtracing.perPixelCount = 1;
+    state.camera.lens.d = 0.0001;
+    state.camera.lens._enabled = true;
     state.autoExposure.enabled = false;
 
     function reset() {
@@ -141,12 +148,81 @@
         ENGINE.clear();
 
         CAMERA_OBJ.body.geometry.center.setN(0, 0, 0);
-
         ENGINE.addBodies([
             state.LIGHT,
             state.GROUND,
             CAMERA_OBJ.body,
         ]);
+
+        const r = 2;
+        const cnt = 14;
+        const offset = -1.5 * cnt;
+        const cls = CustomLaw.createPow(4, 0, 1);
+        for (let i=0; i<cnt; ++i) {
+            const transparency = 1;
+            const br = 0.5 + 2 * (i / (cnt - 1));
+            const refraction = new Vector3(br*1, br*2, br*3);
+            const specularity = new Color(new Vector4(1,1,1,1).multiplyN(cls.to(1 * (i / (cnt - 1)))));
+            const x = (offset + 3*i)*r;
+            const color = new Color(new Vector4(1,1,1).multiplyN(0.000));
+
+            state.ENGINE.addBody(new Body3({ geometry: new DrawableSphere({
+                center: new Vector3(x, r, -9 * r),
+                radius: r,
+                material: new Material({
+                    // color,
+                    refraction,
+                    transparency,
+                    specularity: Color.create(1.0, 1.0, 1.0),
+                }),
+            }) }));
+            state.ENGINE.addBody(new Body3({ geometry: new DrawableCube({
+                center: new Vector3(x, r, -3 * r),
+                radius: r,
+                sizes: new Vector3(r, r, r),
+                material: new Material({
+                    // color,
+                    refraction,
+                    transparency,
+                    specularity: Color.create(1.0, 1.0, 1.0),
+                }),
+            }) }));
+            state.ENGINE.addBody(new Body3({ geometry: new DrawableSphere({
+                center: new Vector3(x, r, 3 * r),
+                radius: r,
+                material: new Material({
+                    color,
+                    specularity,
+                }),
+            }) }));
+            state.ENGINE.addBody(new Body3({ geometry: new DrawableCube({
+                center: new Vector3(x, r, 9 * r),
+                radius: r,
+                sizes: new Vector3(r, r, r),
+                material: new Material({
+                    color,
+                    specularity,
+                }),
+            }) }));
+        }
+
+        state.ENGINE.addBody(new Body3({ geometry: new DrawableCube({
+            center: new Vector3(0, 2 * r - 1, 20 * r),
+            radius: r,
+            sizes: new Vector3(15 * r, 2 * r, r),
+            material: new Material({
+                specularity: Color.create(1, 1, 1, 1),
+            }),
+        }) }));
+
+        state.ENGINE.addBody(new Body3({ geometry: new DrawableSphere({
+            center: new Vector3(0, 2 * r, 0),
+            radius: r,
+            material: new Material({
+                color: Color.create(1, 1, 1),
+                light: Color.create(1e6, 1e6, 1e6),
+            }),
+        }) }));
     }
 
     const gkm = new GKM<
@@ -258,7 +334,7 @@
             reset();
         } else
         if (key === 'Delete') {
-            if (state.hovered.object instanceof RigidBody3) {
+            if (state.hovered.object !== state.GROUND && state.hovered.object !== state.LIGHT) {
                 ENGINE.removeBody(state.hovered.object);
             }
         } else
@@ -471,7 +547,7 @@
         const rigids = ENGINE.rigidMapper.getAll();
         const statics = ENGINE.staticMapper.getAll();
 
-        let info = `Aim (distance:${NUF.format(state.hovered.distance - CAMERA_OBJ.body.geometry.radius)}`;
+        let info = `Aim (distance:${NUF.format(state.hovered.distance)}`;
         if (state.hovered.object) {
             info += `; type:${state.hovered.object['constructor'].name}`;
         }
@@ -484,7 +560,7 @@
         
         state.program.draw({
             camera: state.camera,
-            lights: [<IDrawableGeometry> LIGHT.geometry],
+            lights: [<IDrawableGeometry> state.LIGHT.geometry],
             objects: [
                 ...visibleRigidsGeometry,
                 ...statics.map(o => <IDrawableGeometry> o.geometry),
@@ -527,8 +603,8 @@
             state.r32d.drawObjects(ENGINE.rigidStaticCollisions.map(c => {
                 return [
                     // new DrawableSphere({ center: c.point, radius: 1, color: new Vector3(1,0,0) }),
-                    new DrawableSegment3({ p0: c.point, p1: c.impulse.plus(c.point), color: new Vector3(1,0.5,0) }),
-                    new DrawableSegment3({ p0: c.point, p1: c.normal.plus(c.point), color: new Vector3(1,1,1) }),
+                    new DrawableSegment3({ p0: c.point, p1: c.impulse.plus(c.point), material: new Material({color: Color.create(1,0.5,0)}) }),
+                    new DrawableSegment3({ p0: c.point, p1: c.normal.plus(c.point), material: new Material({color: Color.create(1,1,1)}) }),
                 ];
             }).flat(), state.camera);
             state.r32d.drawObjects(visibleRigidsGeometry.map(g => {
@@ -542,9 +618,9 @@
                 const ay = g.rotation.topDirection().multiplyN(r).plus(p0);
                 const az = g.rotation.forwardDirection().multiplyN(r).plus(p0);
                 return [
-                    new DrawableSegment3({ p0, p1: ax, color: new Vector3(1,0,0) }),
-                    new DrawableSegment3({ p0, p1: ay, color: new Vector3(0,1,0) }),
-                    new DrawableSegment3({ p0, p1: az, color: new Vector3(0,0,1) }),
+                    new DrawableSegment3({ p0, p1: ax, material: new Material({color: Color.create(1,0,0)}) }),
+                    new DrawableSegment3({ p0, p1: ay, material: new Material({color: Color.create(0,1,0)}) }),
+                    new DrawableSegment3({ p0, p1: az, material: new Material({color: Color.create(0,0,1)}) }),
                 ];
             }).flat(), state.camera);
             state.r32d.drawAxes(state.camera);

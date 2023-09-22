@@ -1,5 +1,7 @@
 import { DrawableCube } from "../../drawableGeometry/DrawableCube";
 import { DrawableSphere } from "../../drawableGeometry/DrawableSphere";
+import { Color } from "../../material/Color";
+import { Material } from "../../material/Material";
 import { Vector3 } from "../../math/Vector3";
 import type { Body3 } from "../Body3";
 
@@ -96,7 +98,7 @@ export abstract class Joint3 {
             p0: p.first,
             p1: p.second,
             width: 0.1, // this.getMinRadius() * Math.abs(Math.max(0.1, 1 - this.getStretch())),
-            color: new Vector3(1, 0, 0),
+            material: new Material({ color: Color.create(1, 0, 0) }),
         })
     }
 
@@ -106,12 +108,12 @@ export abstract class Joint3 {
             new DrawableSphere({
                 center: p.first,
                 radius: 0.2,
-                color: new Vector3(1, 0, 0),
+                material: new Material({ color: Color.create(1, 0, 0) }),
             }),
             new DrawableSphere({
                 center: p.second,
                 radius: 0.2,
-                color: new Vector3(1, 0, 0),
+                material: new Material({ color: Color.create(1, 0, 0) }),
             }),
         ];
     }

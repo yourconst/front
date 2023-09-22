@@ -127,7 +127,7 @@ export class Texture {
         if (typeof this.rawSource === 'string') {
             realRawSource = await new Promise<HTMLImageElement>((resolve, reject) => {
                 const img = new Image();
-                img.crossOrigin = 'Anonymous';
+                // img.crossOrigin = 'Anonymous';
 
                 img.onload = () => resolve(img);
                 img.onerror = (error) => reject(error);

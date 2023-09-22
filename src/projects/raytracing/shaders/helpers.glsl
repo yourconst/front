@@ -1,3 +1,110 @@
+
+
+vec2 randomDiskPoint() {
+    // return normalize(vec2(srandom(), srandom()));
+    float angle = random() * M_PI2;
+    float radius = sqrt(random());
+
+    return vec2(cos(angle), sin(angle)) * radius;
+}
+
+vec3 _randomCosineWeightedDirection(const in vec3 normal, const in float u) {
+    // float u = srandom();
+    float v = random();
+    float r = sqrt(u);
+    float angle = M_PI2 * v;
+    // compute basis from normal
+    vec3 sdir, tdir;
+    if (abs(normal.x) < .5) {
+        sdir = cross(normal, vec3(1, 0, 0));
+    } else {
+        sdir = cross(normal, vec3(0, 1, 0));
+    }
+    tdir = cross(normal, sdir);
+    return r * cos(angle) * sdir + r * sin(angle) * tdir + sqrt(1. - u) * normal;
+}
+
+vec3 randomCosineWeightedDirection(const in vec3 normal) {
+    return _randomCosineWeightedDirection(normal, srandom());
+}
+
+vec3 randomCosineWeightedHemispherePoint(const in vec3 normal) {
+    vec3 rand = vec3(srandom(), srandom(), srandom());
+    float r = rand.x * 0.5 + 0.5; // [-1..1) -> [0..1)
+    float angle = (rand.y + 1.0) * M_PI; // [-1..1] -> [0..2*PI)
+    float sr = sqrt(r);
+    vec2 p = vec2(sr * cos(angle), sr * sin(angle));
+    /*
+    * Unproject disk point up onto hemisphere:
+    * 1.0 == sqrt(x*x + y*y + z*z) -> z = sqrt(1.0 - x*x - y*y)
+    */
+    vec3 ph = vec3(p.xy, sqrt(1.0 - p*p));
+    /*
+    * Compute some arbitrary tangent space for orienting
+    * our hemisphere 'ph' around the normal. We use the camera's up vector
+    * to have some fix reference vector over the whole screen.
+    */
+    vec3 tangent = normalize(rand);
+    vec3 bitangent = cross(tangent, normal);
+    tangent = cross(bitangent, normal);
+    
+    /* Make our hemisphere orient around the normal. */
+    return tangent * ph.x + bitangent * ph.y + normal * ph.z;
+}
+
+// has some noise
+vec3 randomSpherePoint() {
+    float ang1 = random() * M_PI2; // [-1..1) -> [0..2*PI)
+    float u = srandom(); // [-1..1), cos and acos(2v-1) cancel each other out, so we arrive at [-1..1)
+    float u2 = u * u;
+    float sqrt1MinusU2 = sqrt(1.0 - u2);
+    return vec3(
+        sqrt1MinusU2 * cos(ang1),
+        sqrt1MinusU2 * sin(ang1),
+        u
+    );
+}
+
+vec3 randomSpherePoint() {
+	vec3 rand = vec3(random(), random(), random());
+	float theta = rand.x * M_PI2;
+	float v = rand.y;
+	float phi = acos(2.0 * v - 1.0);
+	float r = pow(rand.z, 1.0 / 3.0);
+	return vec3(
+        r * sin(phi) * cos(theta),
+        r * sin(phi) * sin(theta),
+        r * cos(phi)
+    );
+}
+
+vec2 randomDiskPoint() {
+    // return normalize(vec2(srandom(), srandom()));
+    float angle = random() * M_PI2;
+    float radius = sqrt(random());
+
+    return vec2(cos(angle), sin(angle)) * radius;
+}
+
+vec3 randomDiskPoint(vec3 n) {
+    vec3 rand = srandomv();
+    float r = rand.x * 0.5 + 0.5; // [-1..1) -> [0..1)
+    float angle = (rand.y + 1.0) * M_PI; // [-1..1] -> [0..2*PI)
+    float sr = sqrt(r);
+    vec2 p = vec2(sr * cos(angle), sr * sin(angle));
+    /*
+    * Compute some arbitrary tangent space for orienting
+    * our disk towards the normal. We use the camera's up vector
+    * to have some fix reference vector over the whole screen.
+    */
+    vec3 tangent = normalize(rand);
+    vec3 bitangent = cross(tangent, n);
+    tangent = cross(bitangent, n);
+    
+    /* Make our disk orient towards the normal. */
+    return tangent * p.x + bitangent * p.y;
+}
+
 vec3 getRelativeDirection(const vec3 ap, const vec3 rotation) {
     // return transpose(rotation) * ap;
     vec3 r_;

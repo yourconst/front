@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
+// import basicSsl from '@vitejs/plugin-basic-ssl';
 import * as url from 'url';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -33,8 +34,13 @@ export default defineConfig({
   // root: '.',
   // publicDir: './public',
   base: './',
-  plugins: [svelte()],
+  plugins: [svelte()/* , basicSsl() */],
   assetsInclude: ['**/*.frag', '**/*.vert', '**/*.tif'],
+  server: {
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+    },
+  },
   build: {
     rollupOptions: {
       input: filenames,

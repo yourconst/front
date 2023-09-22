@@ -1,7 +1,7 @@
 <script lang="ts">
-    import * as customLaws from './customLaws';
     import CustomLawRange from "./CustomLawRange.svelte";
     import type { ExposureCalculator } from '../../../libs/render/ExposureCalculator';
+  import { CustomLaw } from "./customLaws";
 
     export let show = false;
 
@@ -60,11 +60,11 @@
         </tr>
         <tr>
             <td>Resolution</td>
-            <td><CustomLawRange bind:value={resolution} min={0.1} max={2} step='any' law={customLaws.createPow(1.5)} /></td>
+            <td><CustomLawRange bind:value={resolution} min={0.1} max={2} step='any' law={CustomLaw.createPow(1.5)} /></td>
         </tr>
         <tr>
             <td>Exposure</td>
-            <td><CustomLawRange bind:value={exposure} min={autoExposure.range.min} max={autoExposure.range.max} step='any' law={customLaws.createPow(2)} /></td>
+            <td><CustomLawRange bind:value={exposure} min={autoExposure.range.min} max={autoExposure.range.max} step='any' law={CustomLaw.createPow(2)} /></td>
         </tr>
         <tr>
             <td>Auto Exposure</td>
@@ -72,31 +72,31 @@
         </tr>
         <tr>
             <td>Auto Exposure Brightness</td>
-            <td><CustomLawRange bind:value={autoExposure.relativeTargetValue} min={0.01} max={1} step='any' law={customLaws.linear} /></td>
+            <td><CustomLawRange bind:value={autoExposure.relativeTargetValue} min={0.01} max={1} step='any' law={CustomLaw.linear} /></td>
         </tr>
         <tr>
             <td>Auto Exposure Speed</td>
-            <td><CustomLawRange bind:value={autoExposure.speed} min={0.01} max={1} step='any' law={customLaws.createPow(2)} /></td>
+            <td><CustomLawRange bind:value={autoExposure.speed} min={0.01} max={1} step='any' law={CustomLaw.createPow(2)} /></td>
         </tr>
         <tr>
             <td>FOV</td>
-            <td><CustomLawRange bind:value={fov} min={0.4} max={30} step='any' law={customLaws.createPow(2)} /></td>
+            <td><CustomLawRange bind:value={fov} min={0.4} max={30} step='any' law={CustomLaw.createPow(2)} /></td>
         </tr>
         <tr>
             <td>View Distance</td>
-            <td><CustomLawRange bind:value={viewDistance} min={0} max={1e15} step='any' law={customLaws.createPow(5)} /></td>
+            <td><CustomLawRange bind:value={viewDistance} min={0} max={1e15} step='any' law={CustomLaw.createPow(5)} /></td>
         </tr>
         <tr>
             <td>Acceleration</td>
-            <td><CustomLawRange bind:value={acceleration} min={1} max={1e8} step='any' law={customLaws.createPow(2)} /></td>
+            <td><CustomLawRange bind:value={acceleration} min={1} max={1e8} step='any' law={CustomLaw.createPow(2)} /></td>
         </tr>
         <tr>
             <td>Acceleration Boost</td>
-            <td><CustomLawRange bind:value={accelerationBoost} min={2} max={10} step='any' law={customLaws.createPow(2)} /></td>
+            <td><CustomLawRange bind:value={accelerationBoost} min={2} max={10} step='any' law={CustomLaw.createPow(2)} /></td>
         </tr>
         <tr>
             <td>Time flow</td>
-            <td><CustomLawRange bind:value={timeMultiplier} min={0} max={1000} step='any' law={customLaws.createPow(3)} /></td>
+            <td><CustomLawRange bind:value={timeMultiplier} min={0} max={1000} step='any' law={CustomLaw.createPow(3)} /></td>
         </tr>
         <tr>
             <td>Stars</td>
@@ -145,10 +145,10 @@
             </td>
         </tr>
         <tr><td>Orbit distance</td><td>
-            <CustomLawRange bind:value={beSatelliteOfOptions.distance} min={1} max={1e11} step='any' law={customLaws.createPow(1.5)} />
+            <CustomLawRange bind:value={beSatelliteOfOptions.distance} min={1} max={1e11} step='any' law={CustomLaw.createPow(1.5)} />
         </td></tr>
         <tr><td>K</td><td>
-            <CustomLawRange bind:value={beSatelliteOfOptions.k} min={0} max={3} step='any' law={customLaws.linear} />
+            <CustomLawRange bind:value={beSatelliteOfOptions.k} min={0} max={3} step='any' law={CustomLaw.linear} />
         </td></tr>
     </table>
 </div>

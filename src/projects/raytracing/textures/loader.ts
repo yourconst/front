@@ -35,3 +35,6 @@ export { default as uranus } from './uranus.jpg';
 
 // export const neptune = 'https://www.solarsystemscope.com/textures/download/2k_neptune.jpg';
 export { default as neptune } from './neptune.jpg';
+
+// https://learnopengl.com/img/advanced-lighting/normal_mapping_normal_map.png
+export { default as testNormal } from './test_normal.png';

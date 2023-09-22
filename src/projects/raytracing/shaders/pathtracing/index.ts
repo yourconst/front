@@ -67,9 +67,11 @@ export class PathtracingProgram extends Gl2Program<'position', 'SAMPLER', 'Info'
 
         this.frameBuffer = this.ut.gl.createFramebuffer();
 
+        const float = !!this.ut.gl.getExtension('EXT_color_buffer_float');
+
         this.frames = [
-            this.ut.createEmptyTexture({ width: this.ut.gl.drawingBufferWidth, height: this.ut.gl.drawingBufferHeight }),
-            this.ut.createEmptyTexture({ width: this.ut.gl.drawingBufferWidth, height: this.ut.gl.drawingBufferHeight }),
+            this.ut.createEmptyTexture({ float, width: this.ut.gl.drawingBufferWidth, height: this.ut.gl.drawingBufferHeight }),
+            this.ut.createEmptyTexture({ float, width: this.ut.gl.drawingBufferWidth, height: this.ut.gl.drawingBufferHeight }),
         ];
 
         this.frameProgram = new Image2dProgram(ut, this.frames[0]);
@@ -88,13 +90,16 @@ export class PathtracingProgram extends Gl2Program<'position', 'SAMPLER', 'Info'
 
     samplingGetPrevMultiplier() {
         if (!this.sampling.enabled) {
-            return 0;
+            return 1;
         }
 
-        const res = this.sampling.iter / (this.sampling.iter + 1);
-        ++this.sampling.iter;
-        // return Math.min(3, this.sampling.iter);
-        return res;
+        // return ++this.sampling.iter;
+        return Math.pow(1 / ++this.sampling.iter, 0.7);
+
+        // const res = Math.pow(this.sampling.iter / (this.sampling.iter + 1), 10);
+        // ++this.sampling.iter;
+        // // return Math.min(3, this.sampling.iter);
+        // return res;
     }
 
     updateResolution() {

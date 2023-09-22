@@ -10,6 +10,7 @@ export class Lens {
     k: number;
     kMin: number;
     z: number;
+    _fd?: number;
 
     constructor(options?: LensOptions) {
         this.f = options?.f ?? 1;
@@ -17,6 +18,9 @@ export class Lens {
         this.kMin = options?.k ?? 0.1;
         this.z = options?.z ?? 1; // 0.00003;
     }
+
+    get fd() { return this._fd ?? this.f; }
+    set fd(v) { this._fd = v; }
 
     get d() { return this.f / this.k; }
     set d(v) { this.k = this.f / v; }
@@ -50,9 +54,9 @@ export class Lens {
     }
     
     _enabled = true;
-    _movePart = 0.1;
+    _movePart = 0.05;
     // k
-    focusOn(distance: number, part = this._movePart) {
+    private _focusOn(distance: number, part = this._movePart) {
         if (!this._enabled) {
             return;
         }
@@ -65,5 +69,14 @@ export class Lens {
         const bestD = this.calcBestD(distance);
 
         this.d = d + part * (bestD - d);
+    }
+
+    focusOn(distance: number, part = this._movePart) {
+        if (!this._enabled) {
+            return;
+        }
+
+        distance = Math.min(1e7, Math.abs(distance));
+        this.fd += part * (distance - this.fd);
     }
 }

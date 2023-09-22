@@ -26,16 +26,20 @@ export class WebGLStructFiller {
         return offset + this.sizes.Matrix3x3;
     }
 
-    static Vector2(v: Vector2, f32a: Float32Array, offset = 0) {
-        f32a[offset + 0] = v.x;
-        f32a[offset + 1] = v.y;
+    static Vector2(v: Vector2, f32a: Float32Array, offset = 0, relativeTo?: Vector2) {
+        if (v) {
+            f32a[offset + 0] = v.x - (relativeTo?.x || 0);
+            f32a[offset + 1] = v.y - (relativeTo?.y || 0);
+        }
         return offset + this.sizes.Vector2;
     }
 
     static Vector3(v: Vector3, f32a: Float32Array, offset = 0, relativeTo?: Vector3) {
-        f32a[offset + 0] = v.x - (relativeTo?.x || 0);
-        f32a[offset + 1] = v.y - (relativeTo?.y || 0);
-        f32a[offset + 2] = v.z - (relativeTo?.z || 0);
+        if (v) {
+            f32a[offset + 0] = v.x - (relativeTo?.x || 0);
+            f32a[offset + 1] = v.y - (relativeTo?.y || 0);
+            f32a[offset + 2] = v.z - (relativeTo?.z || 0);
+        }
         return offset + this.sizes.Vector3;
     }
 }

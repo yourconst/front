@@ -1,12 +1,12 @@
 <script lang="ts">
-    import * as customLaws from './customLaws';
+  import { CustomLaw } from "./customLaws";
 
     export let value: number;
     export let min = 0;
     export let max = 1;
     export let step: number | 'any' = 'any';
 
-    export let law = customLaws.linear;
+    export let law = CustomLaw.linear;
 
     export let numberShow = true;
     export let defaultShow = true;

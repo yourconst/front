@@ -204,6 +204,7 @@ export class Gl2Utils {
         width: number;
         height: number;
         mipMap?: boolean;
+        float?: boolean;
     }) {
         const type = this.gl.TEXTURE_2D;
         const texture = this.gl.createTexture();
@@ -211,13 +212,13 @@ export class Gl2Utils {
         const config: TextureConfig = {
             source: Math.random().toString(16).slice(2),
             loadedHash: null,
-            type,
             texture,
+            type,
             level: 0,
-            internalFormat: this.gl.RGBA,
+            internalFormat: options.float ? this.gl.RGBA32F : this.gl.RGBA,
             border: 0,
-            srcFormat: this.gl.RGBA,
-            srcType: this.gl.UNSIGNED_BYTE,
+            srcFormat: options.float ? this.gl.RGBA : this.gl.RGBA,
+            srcType: options.float ? this.gl.FLOAT : this.gl.UNSIGNED_BYTE,
             mipMap: options?.mipMap ?? false,
         };
 
